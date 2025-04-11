@@ -15,7 +15,6 @@ from synthcity.metrics.eval_statistical import (
     AlphaPrecision,
     ChiSquaredTest,
     FrechetInceptionDistance,
-    InceptionScore,
     InverseKLDivergence,
     JensenShannonDistance,
     KolmogorovSmirnovTest,

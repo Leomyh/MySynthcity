@@ -55,6 +55,7 @@ from .eval_statistical import (
     KolmogorovSmirnovTest,
     MaximumMeanDiscrepancy,
     PRDCScore,
+    PearsonCorrelation,
     SurvivalKMDistance,
     WassersteinDistance,
 )
@@ -78,6 +79,7 @@ standard_metrics = [
     AlphaPrecision,
     SurvivalKMDistance,
     FrechetInceptionDistance,
+    PearsonCorrelation,
     # performance tests
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,

@@ -919,3 +919,64 @@ class FrechetInceptionDistance(StatisticalEvaluator):
         return {
             "score": score,
         }
+
+class PearsonCorrelation(StatisticalEvaluator):
+    """
+        Evaluates the Pearson correlation coefficient between real and synthetic data.
+
+        For each common numerical feature, the Pearson correlation coefficient
+        is computed, and the average of these coefficients is returned as the score.
+
+        Score interpretation:
+          1.0  — Perfect positive correlation (ideal)
+          0    — No correlation
+         -1.0  — Perfect negative correlation
+        """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(default_metric="marginal", **kwargs)
+
+    @staticmethod
+    def name() -> str:
+        return "pearson_corr"
+
+    @staticmethod
+    def direction() -> str:
+        return "maximize"
+
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
+    def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
+        # Convert DataLoader objects to DataFrames
+        gt_df = X_gt.dataframe()
+        syn_df = X_syn.dataframe()
+
+        # Compute the intersection of common columns (assuming identical schema)
+        common_columns = gt_df.columns.intersection(syn_df.columns)
+        correlations = []
+
+        for col in common_columns:
+            # Convert column to numeric values, non-convertible values become NaN
+            x = pd.to_numeric(gt_df[col], errors="coerce")
+            y = pd.to_numeric(syn_df[col], errors="coerce")
+
+            # Remove rows with missing values
+            valid = x.notna() & y.notna()
+            if valid.sum() < 2:
+                # If there are insufficient valid data, skip this feature
+                continue
+
+            x_arr = x[valid].to_numpy()
+            y_arr = y[valid].to_numpy()
+
+            # Compute Pearson correlation using np.corrcoef which returns a 2x2 matrix
+            corr = np.corrcoef(x_arr, y_arr)[0, 1]
+            correlations.append(corr)
+
+        if len(correlations) == 0:
+            avg_corr = 0.0
+        else:
+            avg_corr = np.mean(correlations)
+        return {
+            "marginal": float(avg_corr)
+        }
+

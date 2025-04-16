@@ -49,7 +49,7 @@ from .eval_sanity import (
 from .eval_statistical import (
     AlphaPrecision,
     ChiSquaredTest,
-   # DendrogramDistanceEvaluator,
+    DendrogramDistanceEvaluator,
     DistanceMatrixEvaluator,
     FrechetInceptionDistance,
     InverseKLDivergence,
@@ -85,7 +85,7 @@ standard_metrics = [
     FrechetInceptionDistance,
     PearsonCorrelation,
     DistanceMatrixEvaluator,
-   # DendrogramDistanceEvaluator,
+    DendrogramDistanceEvaluator,
     #TFTGSimilarity,
     #TGTGSimilarity,
     # performance tests

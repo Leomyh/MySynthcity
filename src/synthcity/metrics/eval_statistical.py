@@ -992,43 +992,18 @@ class PearsonCorrelation(StatisticalEvaluator):
 
 class DistanceMatrixEvaluator(StatisticalEvaluator):
     """
-        Compare pairwise distance matrices between real data (X) and synthetic data (Z).
+      1) Build D^X and D^Z, two n×n matrices of Pearson dissimilarities
+         between each pair of columns (i.e. 1–rho(col_i, col_j)).
+      2) Vectorize their upper‑triangle entries (i<j).
+      3) Return gamma(D^X, D^Z) = PearsonCorr( vec(D^X), vec(D^Z) ).
 
-        For a given DataFrame (with shape [m, n], where m is the number of samples and n is the number of features),
-        - treat each column as a feature vector
-        - compute a pairwise distance matrix D as follows:
-
-          D^X_{i,j} = d( col(X, i), col(X, j) )
-          D^Z_{i,j} = d( col(Z, i), col(Z, j) )
-
-        Use Pearson’s dissimilarity coefficient as the distance:
-          d(u,v) = 1 - PearsonCorrelation(u,v).
-
-        Compare the two distance matrices by computing the Frobenius norm of the difference:
-          S_dist = || D^X - D^Z ||_F
-
-        Alternatively, in similarity mode:
-          S_sim = 1 - (|| D^X - D^Z ||_F / || D^X ||_F)
-
-        Args:
-            metric: A string representing the distance function. Setting metric="correlation" in sklearn's
-                    pairwise_distances calculates 1 - Pearson correlation.
-            mode: "distance" returns the Frobenius norm difference (lower is better).
-                  "similarity" returns 1 - (|| D^X - D^Z ||_F / || D^X ||_F) (higher is better).
+    Returns:
+        {"score": S_dist} in [–1, +1].
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(
-            self,
-            metric: str = "correlation",  # Use Pearson's dissimilarity by default
-            mode: str = "distance",
-            **kwargs: Any
-    ) -> None:
+    def __init__(self, **kwargs: Any):
         super().__init__(default_metric="score", **kwargs)
-        self.metric = metric
-        self.mode = mode
-        if self.mode not in ["distance", "similarity"]:
-            raise ValueError("mode must be either 'distance' or 'similarity'")
 
     @staticmethod
     def name() -> str:
@@ -1036,90 +1011,56 @@ class DistanceMatrixEvaluator(StatisticalEvaluator):
 
     @staticmethod
     def direction() -> str:
-        # Select "maximize" if using distance; for simplicity, the default is to minimize.
-        return "minimize"
+        return "maximize"  # higher correlation = better
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
+        # 1) get dataframes
         df_real = X_gt.dataframe()
-        df_synth = X_syn.dataframe()
+        df_syn  = X_syn.dataframe()
 
-        # Ensure both DataFrames use the same columns (features)
-        if df_real.shape[1] != df_synth.shape[1]:
-            log.warning("Real and synthetic data have different column counts. Proceeding with the intersection.")
-        common_columns = df_real.columns.intersection(df_synth.columns)
-        df_real = df_real[common_columns]
-        df_synth = df_synth[common_columns]
+        # warn if dimensions differ
+        if df_real.shape[1] != df_syn.shape[1]:
+            log.warning("Real/synth have different #columns; proceeding on intersection.")
+            common = df_real.columns.intersection(df_syn.columns)
+            df_real = df_real[common]
+            df_syn  = df_syn[common]
 
-        # In both cases, rows are samples and columns are features.
-        # To compute pairwise distances among features => need to transpose the data.
-        # After transposition, each row represents the vector of a feature across samples.
-        data_real = df_real.to_numpy().T  # shape: [n_features, m_samples]
-        data_synth = df_synth.to_numpy().T  # shape: [n_features, m_samples]
+        # 2) compute pairwise Pearson dissimilarity = 1 − correlation
+        dataR = df_real.to_numpy().T  # [n_features, n_samples]
+        dataS = df_syn.to_numpy().T
 
-        # Compute the pairwise distance matrix.
-        D_real = metrics.pairwise_distances(data_real, metric=self.metric)  # n x n matrix
-        D_synth = metrics.pairwise_distances(data_synth, metric=self.metric)  # n x n matrix
+        D_real = metrics.pairwise_distances(dataR, metric="correlation")
+        D_syn  = metrics.pairwise_distances(dataS, metric="correlation")
 
-        # Compute the overall difference between the two matrices using Frobenius norm.
-        diff_val = np.linalg.norm(D_real - D_synth, ord="fro")
+        # 3) vectorize upper‑triangle (i<j)
+        n = D_real.shape[0]
+        iu = np.triu_indices(n, k=1)
+        v_real = D_real[iu]
+        v_syn  = D_syn[iu]
 
-        # Return the score based on the selected mode.
-        if self.mode == "distance":
-            # Lower Frobenius norm means D_real and D_synth are more similar.
-            score = float(diff_val)
+        # 4) Pearson correlation gamma
+        if v_real.std() == 0 or v_syn.std() == 0:
+            gamma = 0.0
         else:
-            norm_real = np.linalg.norm(D_real, ord="fro")
-            if norm_real < 1e-12:
-                score = 1.0 if diff_val < 1e-12 else 0.0
-            else:
-                score = 1.0 - (diff_val / norm_real)
+            gamma = np.corrcoef(v_real, v_syn)[0, 1]
 
-        return {"score": score}
-
-    def _compute_feature_distance_matrix(self, df: pd.DataFrame, metric: str) -> np.ndarray:
-        """
-            Given a DataFrame of shape (m, n), where m is the number of samples and n is the number
-            of features, treat each column as a feature vector.
-
-            Transpose the DataFrame (resulting in shape: [n, m]) and compute the pairwise distances
-            among rows (features).
-
-            When metric="correlation", this computes:
-                distance(u, v) = 1 - PearsonCorrelation(u, v)
-        """
-        data_t = df.to_numpy().T
-        dist_mat = metrics.pairwise_distances(data_t, metric=metric)
-        return dist_mat
+        return {"score": float(gamma)}
 
 class DendrogramDistanceEvaluator(StatisticalEvaluator):
     """
-        Compare dendrogram structures between real and synthetic data via:
-          1) D^X, D^Z: feature–feature distance matrices using Pearson dissimilarity (1 − correlation)
-          2) z^X, z^Z: hierarchical linkages of each condensed D
-          3) dist_coph^X, dist_coph^Z: cophenetic‐distance vectors from each tree
-          4) S_dendro = ‖dist_coph^X − dist_coph^Z‖_2  (or similarity version)
+      1) From the same D^X, D^Z build two linkage trees.
+      2) Compute their cophenetic‑distance vectors (length = n(n–1)/2).
+      3) Return gamma between those two vectors.
 
-        Args:
-            metric: should be "correlation" to invoke 1 − Pearson rho in sklearn.
-            linkage_method: any scipy linkage (“single”, “complete”, …).
-            mode: "distance" (lower is better) or "similarity" (higher is better).
+    Returns:
+        {"score": S_dend} in [–1, +1].
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(
-            self,
-            metric: str = "correlation",  # default
-            linkage_method: str = "complete",  # default
-            mode: str = "distance",  # default
-            **kwargs: Any
-    ):
+    def __init__(self, linkage_method: str = "complete", **kwargs: Any):
         super().__init__(default_metric="score", **kwargs)
-        self.metric = metric  # TODO: check if need to check raise error control (by sklearn usually => not need)
-        self.linkage_method = linkage_method  # TODO: ...                        (by sklearn usually => not need)
-        self.mode = mode
-        if self.mode not in ["distance", "similarity"]:
-            raise ValueError("mode must be either 'distance' or 'similarity'")
+        self.linkage_method = linkage_method
 
     @staticmethod
     def name() -> str:
@@ -1127,76 +1068,43 @@ class DendrogramDistanceEvaluator(StatisticalEvaluator):
 
     @staticmethod
     def direction() -> str:
-        # By default, if mode='distance', smaller is better =>'minimize'
-        return "minimize"
+        return "maximize"
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
+        # 1) grab dataframes and build the  same  Pearson‐dissimilarity matrices
         df_real = X_gt.dataframe()
-        df_synth = X_syn.dataframe()
+        df_syn  = X_syn.dataframe()
 
-        if df_real.shape[1] != df_synth.shape[1]:
-            log.warning("Real and synthetic data have different numbers of columns. Proceed with caution.")
-        common_columns = df_real.columns.intersection(df_synth.columns)
-        df_real = df_real[common_columns]
-        df_synth = df_synth[common_columns]
+        if df_real.shape[1] != df_syn.shape[1]:
+            log.warning("Real/synth have different #columns; using intersection.")
+            common = df_real.columns.intersection(df_syn.columns)
+            df_real = df_real[common]
+            df_syn  = df_syn[common]
 
-        # transpose: rows = features, cols = samples
-        feat_real = df_real.to_numpy().T  # [n_features, n_samples]
-        feat_synth = df_synth.to_numpy().T
+        dataR = df_real.to_numpy().T
+        dataS = df_syn.to_numpy().T
 
-        # 1) Compute nxn distance matrices
-        D_real = metrics.pairwise_distances(feat_real, metric=self.metric)  # n x n matrix
-        D_synth = metrics.pairwise_distances(feat_synth, metric=self.metric)  # n x n matrix
+        D_real = metrics.pairwise_distances(dataR, metric="correlation")
+        D_syn  = metrics.pairwise_distances(dataS, metric="correlation")
 
-        # 2) hierarchical linkage on condensed form
-        condensed_real = squareform(D_real)
-        condensed_synth = squareform(D_synth)
-        z_real = linkage(condensed_real, method=self.linkage_method)
-        z_synth = linkage(condensed_synth, method=self.linkage_method)
+        # 2) condense for linkage()
+        c_real = squareform(D_real, checks=False)
+        c_syn  = squareform(D_syn,  checks=False)
 
-        # 3) cophenetic distances
-        # Compare either the z arrays directly,
-        # or compute an "ultra-metric" dendrogram distance matrix from each
-        # or compare Cophenetic Correlation (correlation between cophenetic distances)
-        coph_real, dist_coph_real = cophenet(z_real,condensed_real)
-        coph_synth, dist_coph_synth = cophenet(z_synth,condensed_synth)
+        # 3) linkage trees
+        Z_real = linkage(c_real, method=self.linkage_method)
+        Z_syn  = linkage(c_syn,  method=self.linkage_method)
 
-        # dist_coph_real and dist_coph_synth each hold the pairwise "cophenetic distances" among the items in the cluster tree
+        # 4) cophenetic distances
+        #    (cophenet returns: corr_coeff, coph_dists)
+        _, d_real = cophenet(Z_real, c_real)
+        _, d_syn  = cophenet(Z_syn,  c_syn)
 
-        # Might compare them in the same "distance vs similarity" style:
-        # Interpreter them as vectors and take Frobenius-like norm difference.
-        # They are 1D arrays because it's the condensed distance.
-        # Do: -> difference = || dist_coph_real - dist_coph_synth ||_2
-
-        # 4) Euclidean between the two cophenetic‐distance vectors
-        min_len = min(len(dist_coph_real), len(dist_coph_synth))
-        # If real/synth differ in shape, just a caution or handle partial overlap.
-        if len(dist_coph_real) != len(dist_coph_synth):
-            log.warning("Dendrogram distance matrices have different shapes. Using partial overlap")
-        dist_diff = dist_coph_real[:min_len] - dist_coph_synth[:min_len]
-        diff_val = np.linalg.norm(dist_diff, ord=2)
-
-        if self.mode == "distance":
-            score = float(diff_val)
+        # 5) Pearson gamma between those two vectors
+        if d_real.std() == 0 or d_syn.std() == 0:
+            gamma = 0.0
         else:
-            # "similarity" => 1 - (diff / norm_real)
-            norm_real = np.linalg.norm(dist_coph_real[:min_len], ord=2)
-            if norm_real < 1e-12:
-                score = 1.0 if diff_val < 1e-12 else 0.0
-            else:
-                score = 1.0 - (diff_val / norm_real)
+            gamma = np.corrcoef(d_real, d_syn)[0, 1]
 
-        return {
-            "score": score
-        }
-
-    def _compute_feature_distance_matrix(self, df: pd.DataFrame, metric: str) -> np.ndarray:
-        """
-            For each column in df (treated as a feature vector), compute pairwaise distances,
-            resulting in an nxn distance matrix.
-        """
-        data_t = df.to_numpy().T  # shape: [n, m]
-        dist_mat = metrics.pairwise_distances(data_t, metric=metric)
-        return dist_mat
-
+        return {"score": float(gamma)}

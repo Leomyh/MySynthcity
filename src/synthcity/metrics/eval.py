@@ -49,6 +49,8 @@ from .eval_sanity import (
 from .eval_statistical import (
     AlphaPrecision,
     ChiSquaredTest,
+    DendrogramDistanceEvaluator,
+    DistanceMatrixEvaluator,
     FrechetInceptionDistance,
     InverseKLDivergence,
     JensenShannonDistance,
@@ -57,6 +59,8 @@ from .eval_statistical import (
     PRDCScore,
     PearsonCorrelation,
     SurvivalKMDistance,
+    TFTGSimilarity,
+    TGTGSimilarity,
     WassersteinDistance,
 )
 from .scores import ScoreEvaluator
@@ -80,6 +84,10 @@ standard_metrics = [
     SurvivalKMDistance,
     FrechetInceptionDistance,
     PearsonCorrelation,
+    DistanceMatrixEvaluator,
+    DendrogramDistanceEvaluator,
+    TFTGSimilarity,
+    TGTGSimilarity,
     # performance tests
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,

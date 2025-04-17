@@ -18,7 +18,6 @@ from sklearn import metrics
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler
 
-
 # synthcity absolute
 import synthcity.logger as log
 from synthcity.metrics._utils import get_frequency
@@ -940,6 +939,7 @@ class PearsonCorrelation(StatisticalEvaluator):
              0   — No correlation.
             -1.0 — Perfect negative correlation.
     """
+
     def __init__(self, metric: str = "euclidean", **kwargs: Any) -> None:
         # Set default_metric as "marginal" for compatibility with the framework
         super().__init__(default_metric="marginal", **kwargs)
@@ -955,42 +955,41 @@ class PearsonCorrelation(StatisticalEvaluator):
         return "maximize"
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
-        # Get dataframes from the data loaders
-        gt_df = X_gt.dataframe()
-        syn_df = X_syn.dataframe()
+    def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        df_real = X.dataframe()
+        df_syn = X_syn.dataframe()
 
         # Compute the intersection of common columns (assuming identical schema)
-        common_columns = gt_df.columns.intersection(syn_df.columns)
+        common_columns = df_real.columns.intersection(df_syn.columns)
         if len(common_columns) == 0:
             return {"marginal": 0.0}
 
         # Restrict both dataframes to the common columns
-        df_real = gt_df[common_columns]
-        df_syn = syn_df[common_columns]
+        df_real = df_real[common_columns]
+        df_syn = df_syn[common_columns]
 
         # Convert each DataFrame to a numpy array and transpose it,
         # so that each row represents a feature vector (one column of the original DataFrame).
         data_real = df_real.to_numpy().T  # shape: [n_features, n_samples]
-        data_syn = df_syn.to_numpy().T    # shape: [n_features, n_samples]
+        data_syn = df_syn.to_numpy().T  # shape: [n_features, n_samples]
 
         # Compute the pairwise distance matrices for real and synthetic data
         # The resulting distance matrix is of shape [n_features, n_features]
         dist_real = metrics.pairwise_distances(data_real, metric=self.metric)
-        dist_syn  = metrics.pairwise_distances(data_syn, metric=self.metric)
+        dist_syn = metrics.pairwise_distances(data_syn, metric=self.metric)
 
         # Extract the upper-triangular (excluding the diagonal) elements from each matrix.
         n = dist_real.shape[0]
         idx = np.triu_indices(n, k=1)
         vec_real = dist_real[idx]
-        vec_syn  = dist_syn[idx]
+        vec_syn = dist_syn[idx]
 
         # Compute the Pearson correlation coefficient between the two 1D vectors.
-        corr = np.corrcoef(vec_real, vec_syn)[0, 1]
-        return {"marginal": float(corr)}
+        gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
+        return {"marginal": float(gamma)}
 
 
-class DistanceMatrixEvaluator(StatisticalEvaluator):
+class MatrixDistance(StatisticalEvaluator):
     """
       1) Build D^X and D^Z, two n×n matrices of Pearson dissimilarities
          between each pair of columns (i.e. 1–rho(col_i, col_j)).
@@ -1014,40 +1013,45 @@ class DistanceMatrixEvaluator(StatisticalEvaluator):
         return "maximize"  # higher correlation = better
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
-        # 1) get dataframes
-        df_real = X_gt.dataframe()
-        df_syn  = X_syn.dataframe()
+    def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        # 1) Load the dataframes
+        df_real = X.dataframe()
+        df_syn = X_syn.dataframe()
 
-        # warn if dimensions differ
+        # Align to common columns if schema differs
         if df_real.shape[1] != df_syn.shape[1]:
-            log.warning("Real/synth have different #columns; proceeding on intersection.")
+            log.warning(
+                "Real/synthetic sets have different numbers of columns; "
+                "restricting to their intersection."
+            )
             common = df_real.columns.intersection(df_syn.columns)
             df_real = df_real[common]
-            df_syn  = df_syn[common]
+            df_syn = df_syn[common]
 
-        # 2) compute pairwise Pearson dissimilarity = 1 − correlation
-        dataR = df_real.to_numpy().T  # [n_features, n_samples]
-        dataS = df_syn.to_numpy().T
+        # Convert to [n_features, n_samples] so pairwise distances are over genes
+        data_real = df_real.to_numpy().T  # [n_features, n_samples]
+        data_syn = df_syn.to_numpy().T
 
-        D_real = metrics.pairwise_distances(dataR, metric="correlation")
-        D_syn  = metrics.pairwise_distances(dataS, metric="correlation")
+        # Pair‑wise Pearson dissimilarities (1 − correlation)
+        dist_real = metrics.pairwise_distances(data_real, metric="correlation")
+        dist_syn = metrics.pairwise_distances(data_syn, metric="correlation")
 
-        # 3) vectorize upper‑triangle (i<j)
-        n = D_real.shape[0]
-        iu = np.triu_indices(n, k=1)
-        v_real = D_real[iu]
-        v_syn  = D_syn[iu]
+        # Vectorize the upper‑triangle (excluding the diagonal)
+        n = dist_real.shape[0]
+        idx = np.triu_indices(n, k=1)
+        vec_real = dist_real[idx]
+        vec_syn = dist_syn[idx]
 
-        # 4) Pearson correlation gamma
-        if v_real.std() == 0 or v_syn.std() == 0:
+        # Pearson correlation between the two vectors
+        if vec_real.std() == 0 or vec_syn.std() == 0:
             gamma = 0.0
         else:
-            gamma = np.corrcoef(v_real, v_syn)[0, 1]
+            gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
 
         return {"score": float(gamma)}
 
-class DendrogramDistanceEvaluator(StatisticalEvaluator):
+
+class DendrogramDistance(StatisticalEvaluator):
     """
       1) From the same D^X, D^Z build two linkage trees.
       2) Compute their cophenetic‑distance vectors (length = n(n–1)/2).
@@ -1071,40 +1075,151 @@ class DendrogramDistanceEvaluator(StatisticalEvaluator):
         return "maximize"
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
-        # 1) grab dataframes and build the  same  Pearson‐dissimilarity matrices
-        df_real = X_gt.dataframe()
-        df_syn  = X_syn.dataframe()
+    def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        df_real = X.dataframe()
+        df_syn = X_syn.dataframe()
 
         if df_real.shape[1] != df_syn.shape[1]:
-            log.warning("Real/synth have different #columns; using intersection.")
+            log.warning(
+                "Real/synthetic sets have different numbers of columns; "
+                "restricting to their intersection."
+            )
             common = df_real.columns.intersection(df_syn.columns)
             df_real = df_real[common]
-            df_syn  = df_syn[common]
+            df_syn = df_syn[common]
 
-        dataR = df_real.to_numpy().T
-        dataS = df_syn.to_numpy().T
+        data_real = df_real.to_numpy().T
+        data_syn = df_syn.to_numpy().T
 
-        D_real = metrics.pairwise_distances(dataR, metric="correlation")
-        D_syn  = metrics.pairwise_distances(dataS, metric="correlation")
+        # Pearson dissimilarity matrices
+        dist_real = metrics.pairwise_distances(data_real, metric="correlation")
+        dist_syn = metrics.pairwise_distances(data_syn, metric="correlation")
 
-        # 2) condense for linkage()
-        c_real = squareform(D_real, checks=False)
-        c_syn  = squareform(D_syn,  checks=False)
+        # Condensed form (required by linkage)
+        con_real = squareform(dist_real, checks=False)
+        con_syn = squareform(dist_syn, checks=False)
 
-        # 3) linkage trees
-        Z_real = linkage(c_real, method=self.linkage_method)
-        Z_syn  = linkage(c_syn,  method=self.linkage_method)
+        # Build linkage (hierarchical clustering) trees
+        tree_real = linkage(con_real, method=self.linkage_method)
+        tree_syn = linkage(con_syn, method=self.linkage_method)
 
-        # 4) cophenetic distances
-        #    (cophenet returns: corr_coeff, coph_dists)
-        _, d_real = cophenet(Z_real, c_real)
-        _, d_syn  = cophenet(Z_syn,  c_syn)
+        # Cophenetic distance vectors  (cophenet returns (corr, dists))
+        _, dist_real = cophenet(tree_real, con_real)
+        _, dist_syn = cophenet(tree_syn, con_syn)
 
-        # 5) Pearson gamma between those two vectors
-        if d_real.std() == 0 or d_syn.std() == 0:
+        # Pearson correlation between the two cophenetic‑distance vectors
+        if dist_real.std() == 0 or dist_syn.std() == 0:
             gamma = 0.0
         else:
-            gamma = np.corrcoef(d_real, d_syn)[0, 1]
+            gamma = np.corrcoef(dist_real, dist_syn)[0, 1]
 
         return {"score": float(gamma)}
+
+
+class TFTGSimilarity(StatisticalEvaluator):
+    """
+        Weighted‑sum TF–TG similarity  (S_TF‑TG  ∈ [‑1, 1]).
+
+        Let
+            r_f^D = ( d(col(D, f), col(D, g))  for g in G(f) )
+        be the vector of distances between TF *f* and each of its target genes for dataset *D* (real = X, synthetic = Z).
+
+        The metric:
+            S_TF‑TG = ( Σ_f w_f · cos( r_f^X , r_f^Z ) ) / Σ_f w_f
+
+        Arguments
+        ----------
+        grn : Dict[str, List[str]]
+            Prior gene‑regulatory network.
+            Key   = column name of a TF.
+            Value = list of column names of its target genes (TGs).
+        distance : str, default "correlation"
+            Distance metric *d(·,·)* used between expression vectors.
+            "correlation" → Pearson dissimilarity (1 − ρ); otherwise delegates to ``sklearn.metrics.pairwise_distances``.
+        weighting : {"degree", "uniform"}, default "degree"
+            How to choose TF weights *w_f*:
+                "degree"  → w_f = |G(f)|   (number of TGs),
+                "uniform" → w_f = 1.
+    """
+
+    def __init__(
+            self,
+            grn: Dict[str, list],
+            distance: str = "correlation",
+            weighting: str = "degree",
+            **kwargs: Any,
+    ):
+        super().__init__(default_metric="score", **kwargs)
+        self.grn = grn
+        self.distance = distance
+        self.weighting = weighting
+
+    @staticmethod
+    def name() -> str:
+        return "tf_tg_similarity"
+
+    @staticmethod
+    def direction() -> str:
+        return "maximize"
+
+    # ---------- main ----------
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
+    def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        df_real = X.dataframe()
+        df_syn = X_syn.dataframe()
+
+        num, den = 0.0, 0.0  # accumulators for weighted average
+
+        for tf, tgs in self.grn.items():
+            # Ensure the TF exists in both datasets
+            if (tf not in df_real.columns) or (tf not in df_syn.columns):
+                continue
+
+            # Keep only TGs present in both datasets
+            valid_tgs = [g for g in tgs if (g in df_real.columns) and (g in df_syn.columns)]
+            if len(valid_tgs) == 0:
+                continue
+
+            # r_f^D   (length = |G(f)|)
+            r_real = np.array(
+                [self._pair_distance(df_real[tf].to_numpy(), df_real[g].to_numpy())
+                 for g in valid_tgs],
+                dtype=float,
+            )
+            r_syn = np.array(
+                [self._pair_distance(df_syn[tf].to_numpy(), df_syn[g].to_numpy())
+                 for g in valid_tgs],
+                dtype=float,
+            )
+
+            v_fg = self._cosine(r_real, r_syn)
+            w_f = len(valid_tgs) if self.weighting == "degree" else 1.0
+            num += w_f * v_fg
+            den += w_f
+
+        score = num / den if den > 0 else 0.0
+        return {"score": float(score)}
+
+    # ---------- helpers ----------
+    def _pair_distance(self, x: np.ndarray, y: np.ndarray) -> float:
+        """
+            Compute d(x, y) for two 1‑D expression vectors.
+        """
+        if self.distance == "correlation":
+            rho = np.corrcoef(x, y)[0, 1]
+            return 1.0 - rho  # Pearson dissimilarity
+        else:
+            return float(
+                metrics.pairwise_distances(
+                    x.reshape(1, -1), y.reshape(1, -1), metric=self.distance
+                )[0, 0]
+            )
+
+    def _cosine(self, a: np.ndarray, b: np.ndarray) -> float:
+        """
+            Cosine similarity between two vectors; returns 0 if any norm is 0.
+        """
+        na, nb = np.linalg.norm(a), np.linalg.norm(b)
+        if na == 0 or nb == 0:
+            return 0.0
+        return float(np.dot(a, b) / (na * nb))

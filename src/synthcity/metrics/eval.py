@@ -59,7 +59,7 @@ from .eval_statistical import (
     PRDCScore,
     PearsonCorrelation,
     SurvivalKMDistance,
-   # TFTGSimilarity,
+    TFTGSimilarity,
    # TGTGSimilarity,
     WassersteinDistance,
 )
@@ -86,7 +86,7 @@ standard_metrics = [
     PearsonCorrelation,
     MatrixDistance,
     DendrogramDistance,
-    #TFTGSimilarity,
+    TFTGSimilarity,
     #TGTGSimilarity,
     # performance tests
     PerformanceEvaluatorLinear,

@@ -28,7 +28,7 @@ from .eval_performance import (
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,
     PerformanceEvaluatorXGB,
-    ReverseValidationMLP,
+    #ReverseValidationMLP,
 )
 from .eval_privacy import (
     DeltaPresence,
@@ -97,7 +97,7 @@ standard_metrics = [
     AugmentationPerformanceEvaluatorMLP,
     AugmentationPerformanceEvaluatorXGB,
     FeatureImportanceRankDistance,
-    ReverseValidationMLP,
+    #ReverseValidationMLP,
     # synthetic detection tests
     SyntheticDetectionXGB,
     SyntheticDetectionMLP,

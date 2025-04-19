@@ -1024,9 +1024,10 @@ class MatrixDistance(StatisticalEvaluator):
                 "Real/synthetic sets have different numbers of columns; "
                 "restricting to their intersection."
             )
-            common = df_real.columns.intersection(df_syn.columns)
-            df_real = df_real[common]
-            df_syn = df_syn[common]
+            common_columns = df_real.columns.intersection(df_syn.columns)
+            # Restrict both dataframes to the common columns
+            df_real = df_real[common_columns]
+            df_syn = df_syn[common_columns]
 
         # Convert to [n_features, n_samples] so pairwise distances are over genes
         data_real = df_real.to_numpy().T  # [n_features, n_samples]
@@ -1084,9 +1085,10 @@ class DendrogramDistance(StatisticalEvaluator):
                 "Real/synthetic sets have different numbers of columns; "
                 "restricting to their intersection."
             )
-            common = df_real.columns.intersection(df_syn.columns)
-            df_real = df_real[common]
-            df_syn = df_syn[common]
+            common_columns = df_real.columns.intersection(df_syn.columns)
+            # Restrict both dataframes to the common columns
+            df_real = df_real[common_columns]
+            df_syn = df_syn[common_columns]
 
         data_real = df_real.to_numpy().T
         data_syn = df_syn.to_numpy().T
@@ -1205,20 +1207,120 @@ class TFTGSimilarity(StatisticalEvaluator):
         """
             Compute d(x, y) for two 1‑D expression vectors.
         """
-        if self.distance == "correlation":
-            rho = np.corrcoef(x, y)[0, 1]
-            return 1.0 - rho  # Pearson dissimilarity
-        else:
-            return float(
-                metrics.pairwise_distances(
-                    x.reshape(1, -1), y.reshape(1, -1), metric=self.distance
-                )[0, 0]
-            )
+        return float(
+            metrics.pairwise_distances(
+                x.reshape(1, -1), y.reshape(1, -1), metric=self.distance
+            )[0, 0]
+        )
 
     def _cosine(self, a: np.ndarray, b: np.ndarray) -> float:
         """
             Cosine similarity between two vectors; returns 0 if any norm is 0.
         """
+        na, nb = np.linalg.norm(a), np.linalg.norm(b)
+        if na == 0 or nb == 0:
+            return 0.0
+        return float(np.dot(a, b) / (na * nb))
+
+
+class TGTGSimilarity(StatisticalEvaluator):
+    """
+        Weighted‑sum TG–TG similarity  (S_TG‑TG  ∈ [‑1, 1]).
+
+        For each TF *f* and each of its TGs *g € G(f)* define
+            q_{f,g}^D = ( d(col(D, g), col(D, i))  for i in G(f) \\ {g} ).
+
+        The metric:
+            S_TG‑TG = ( Σ_f w_f · Σ_{g∈G(f)} cos( q_{f,g}^X , q_{f,g}^Z ) )
+                      / ( Σ_f w_f · |G(f)| )
+
+        Parameters
+        ----------
+        grn       : same as above
+        distance  : same as above
+        weighting : same as above
+    """
+
+    def __init__(
+            self,
+            grn: Dict[str, list],
+            distance: str = "correlation",
+            weighting: str = "degree",
+            **kwargs: Any,
+    ):
+        super().__init__(default_metric="score", **kwargs)
+        self.grn = grn
+        self.distance = distance
+        self.weighting = weighting
+
+    # API metadata
+    @staticmethod
+    def name() -> str:
+        return "tg_tg_similarity"
+
+    @staticmethod
+    def direction() -> str:
+        return "maximize"
+
+    # ---------- main ----------
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
+    def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        df_real = X.dataframe()
+        df_syn = X_syn.dataframe()
+
+        num, den = 0.0, 0.0
+
+        for tf, tgs in self.grn.items():
+            # Intersection of TGs present in both datasets
+            valid_tgs = [g for g in tgs if g in df_real.columns and g in df_syn.columns]
+            if len(valid_tgs) < 2:  # need at least two TGs
+                continue
+
+            w_f = len(valid_tgs) if self.weighting == "degree" else 1.0
+            tf_sum_sim = 0.0
+
+            for g in valid_tgs:
+                others = [i for i in valid_tgs if i != g]
+
+                q_real = np.array(
+                    [
+                        self._pair_distance(
+                            df_real[g].to_numpy(), df_real[i].to_numpy()
+                        )
+                        for i in others
+                    ],
+                    dtype=float,
+                )
+                q_syn = np.array(
+                    [
+                        self._pair_distance(
+                            df_syn[g].to_numpy(), df_syn[i].to_numpy()
+                        )
+                        for i in others
+                    ],
+                    dtype=float,
+                )
+
+                tf_sum_sim += self._cosine(q_real, q_syn)
+
+            num += w_f * tf_sum_sim
+            den += w_f * len(valid_tgs)
+
+        score = num / den if den > 0 else 0.0
+        return {"score": float(score)}
+
+    # ---------- helpers ----------
+    def _pair_distance(self, x: np.ndarray, y: np.ndarray) -> float:
+        if self.distance == "correlation":
+            rho = np.corrcoef(x, y)[0, 1]
+            return 1.0 - rho
+        return float(
+            metrics.pairwise_distances(
+                x.reshape(1, -1), y.reshape(1, -1), metric=self.distance
+            )[0, 0]
+        )
+
+    def _cosine(self, a: np.ndarray, b: np.ndarray) -> float:
         na, nb = np.linalg.norm(a), np.linalg.norm(b)
         if na == 0 or nb == 0:
             return 0.0

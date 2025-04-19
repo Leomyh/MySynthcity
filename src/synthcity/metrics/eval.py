@@ -28,6 +28,7 @@ from .eval_performance import (
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,
     PerformanceEvaluatorXGB,
+    ReverseValidationMLP,
 )
 from .eval_privacy import (
     DeltaPresence,
@@ -60,7 +61,7 @@ from .eval_statistical import (
     PearsonCorrelation,
     SurvivalKMDistance,
     TFTGSimilarity,
-   # TGTGSimilarity,
+    TGTGSimilarity,
     WassersteinDistance,
 )
 from .scores import ScoreEvaluator
@@ -87,7 +88,7 @@ standard_metrics = [
     MatrixDistance,
     DendrogramDistance,
     TFTGSimilarity,
-    #TGTGSimilarity,
+    TGTGSimilarity,
     # performance tests
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,
@@ -96,6 +97,7 @@ standard_metrics = [
     AugmentationPerformanceEvaluatorMLP,
     AugmentationPerformanceEvaluatorXGB,
     FeatureImportanceRankDistance,
+    ReverseValidationMLP,
     # synthetic detection tests
     SyntheticDetectionXGB,
     SyntheticDetectionMLP,

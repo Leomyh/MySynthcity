@@ -18,6 +18,7 @@ from synthcity.plugins.core.constraints import Constraints
 from synthcity.plugins.core.dataloader import (
     DataLoader,
     GenericDataLoader,
+    GeneExpressionDataLoader,
     TimeSeriesDataLoader,
     TimeSeriesSurvivalDataLoader,
     create_from_info,

@@ -1146,7 +1146,7 @@ class TFTGSimilarity(StatisticalEvaluator):
 
     def __init__(
             self,
-            grn: Dict[str, list],
+            grn: Optional [Dict[str, list]] = None,
             distance: str = "correlation",
             weighting: str = "degree",
             **kwargs: Any,
@@ -1167,6 +1167,15 @@ class TFTGSimilarity(StatisticalEvaluator):
     # ---------- main ----------
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        if self.grn is None:
+            if hasattr(X, "grn"):
+                self.grn = X.grn()
+            else:
+                raise ValueError(
+                    "TFTGSimilarity needs a GRN. "
+                    "Pass it to the constructor or use a DataLoader that provides `.grn()`."
+                )
+
         df_real = X.dataframe()
         df_syn = X_syn.dataframe()
 
@@ -1243,7 +1252,7 @@ class TGTGSimilarity(StatisticalEvaluator):
 
     def __init__(
             self,
-            grn: Dict[str, list],
+            grn: Optional [Dict[str, list]] = None,
             distance: str = "correlation",
             weighting: str = "degree",
             **kwargs: Any,
@@ -1265,6 +1274,14 @@ class TGTGSimilarity(StatisticalEvaluator):
     # ---------- main ----------
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        if self.grn is None:
+            if hasattr(X, "grn"):
+                self.grn = X.grn()
+            else:
+                raise ValueError(
+                    "TFTGSimilarity needs a GRN. "
+                    "Pass it to the constructor or use a DataLoader that provides `.grn()`."
+                )
         df_real = X.dataframe()
         df_syn = X_syn.dataframe()
 

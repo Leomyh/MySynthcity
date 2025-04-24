@@ -28,9 +28,10 @@ from .eval_performance import (
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,
     PerformanceEvaluatorXGB,
-    #ReverseValidationMLP,
+    ReverseValidationMLP,
 )
 from .eval_privacy import (
+    AdversarialAccuracy,
     DeltaPresence,
     DomiasMIABNAF,
     DomiasMIAKDE,
@@ -97,13 +98,14 @@ standard_metrics = [
     AugmentationPerformanceEvaluatorMLP,
     AugmentationPerformanceEvaluatorXGB,
     FeatureImportanceRankDistance,
-    #ReverseValidationMLP,
+    ReverseValidationMLP,
     # synthetic detection tests
     SyntheticDetectionXGB,
     SyntheticDetectionMLP,
     SyntheticDetectionGMM,
     SyntheticDetectionLinear,
     # privacy tests
+    AdversarialAccuracy,
     DeltaPresence,
     kAnonymization,
     kMap,
@@ -112,6 +114,7 @@ standard_metrics = [
     DomiasMIABNAF,  # TODO: This takes too long to include as default
     DomiasMIAKDE,
     DomiasMIAPrior,
+
 ]
 
 

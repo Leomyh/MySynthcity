@@ -608,3 +608,87 @@ class DomiasMIABNAF(DomiasMIA):
             .numpy()
         )
         return p_G_evaluated, p_R_evaluated
+
+class AdversarialAccuracy(PrivacyEvaluator):
+    """
+        Adversarial Accuracy (AA) from Yale et al. (2020).
+
+        Intuition
+        ---------
+        AA tells us whether synthetic data are
+        (i) too close to the real data – privacy leakage, low utility – or
+        (ii) too far away – poor fidelity.
+        It is the accuracy of a 1-NN classifier that tries to distinguish real from synthetic samples using Euclidean distances.
+
+        Let
+            d_tt(i):  nearest-neighbor distance from real sample i to all other real samples (excluding itself)
+            d_tg(i):  NN distance from real sample i to the synthetic set
+            d_gg(j):  NN distance from synthetic sample j to all other synthetic samples (excluding itself)
+            d_gt(j):  NN distance from synthetic sample j to the real set
+
+        The metric is
+
+            AA = 0.5 * [ (1/n) Σ 1( d_tg(i) > d_tt(i) )   +
+                        (1/m) Σ 1( d_gt(j) > d_gg(j) )
+                       ]
+
+        Range and interpretation
+        ------------------------
+          • AA → 0 : generator over-fits (synthetic ≈ real, privacy ↓, utility ↓)
+          • AA → 1 : generator under-fits (synthetic easily separable, utility ↓)
+          • AA ≈ 0.5 : good trade-off between realism and privacy (ideal)
+
+        The evaluator returns {"aa": float}.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(default_metric="aa", **kwargs)
+
+    @staticmethod
+    def name() -> str:
+        return "adversarial_accuracy"
+
+    @staticmethod
+    def direction() -> str:
+        # Best value is 0.5; downstream code can optimize |AA – 0.5|.
+        return "custom"
+
+    # ---------- main evaluation ------------------------------------------
+
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
+    def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
+        if X_gt.type() == "images":
+            raise ValueError("AdversarialAccuracy is not defined for images.")
+
+        real = X_gt.numpy().astype(float)
+        syn = X_syn.numpy().astype(float)
+
+        # 1) d_tt: distance to the 2-nd nearest neighbour in the real set
+        nn_real = NearestNeighbors(n_neighbors=2).fit(real)
+        d_tt = nn_real.kneighbors(real, return_distance=True)[0][:, 1]
+
+        # 2) Cross-set distances
+        d_tg = self._pairwise_min_dist(real, syn)
+        d_gt = self._pairwise_min_dist(syn, real)
+
+        # 3) d_gg: distance to the 2-nd NN in the synthetic set
+        if len(syn) > 1:
+            nn_syn = NearestNeighbors(n_neighbors=2).fit(syn)
+            d_gg = nn_syn.kneighbors(syn, return_distance=True)[0][:, 1]
+        else:# edge case: only one synthetic sample
+            d_gg = np.full(len(syn), np.inf)
+
+        # 4) Compute AA
+        aa_left  = (d_tg > d_tt).mean()
+        aa_right = (d_gt > d_gg).mean()
+        aa = 0.5 * (aa_left + aa_right)
+
+        return {"aa": float(aa)}
+
+    # ---------- helpers --------------------------------------------------
+
+    @staticmethod
+    def _pairwise_min_dist(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        """For every point in `a` return its minimum Euclidean distance to set `b`."""
+        dists = np.linalg.norm(a[:, None, :] - b[None, :, :], axis=-1)
+        return dists.min(axis=1)

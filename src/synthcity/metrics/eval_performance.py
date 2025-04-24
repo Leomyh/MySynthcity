@@ -1155,3 +1155,61 @@ class FeatureImportanceRankDistance(MetricEvaluator):
         results = self.evaluate(X_gt, X_syn)
 
         return results["corr"]
+
+
+class ReverseValidationMLP(PerformanceEvaluatorMLP):
+    """
+        Reverse‑validation: train an MLP purely on synthetic data, then
+        evaluate on a held‑out true test set.
+
+        Returns
+        -------
+        dict with keys
+            gt    : baseline performance (real‑train → real‑test)
+            syn   : reverse‑validation performance (syn‑train → real‑test)
+            ratio : syn / gt (1 → synthetic keeps discriminant info)
+
+        Works for tabular <<classification>> or <<regression>> tasks.
+    """
+
+    @staticmethod
+    def name() -> str:
+        return "mlp_reverse_validation"
+
+    @staticmethod
+    def standard_performance_output_keys() -> List:
+        # only care about gt baseline and syn_ood (= reverse‑val)
+        return ["gt", "syn_ood"]
+
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
+    def evaluate(
+            self,
+            X_gt: DataLoader,
+            X_syn: DataLoader,
+    ) -> Dict:
+        if self._task_type not in ("classification", "regression"):
+            raise RuntimeError(
+                f"Reverse validation MLP only implemented for "
+                f"classification / regression tasks, got {self._task_type}"
+            )
+
+        # parent already computes gt / syn_ood when call its version
+        res = super().evaluate(X_gt, X_syn)
+
+        # 'syn_ood' key from PerformanceEvaluatorMLP._evaluate_standard_performance
+        gt = res.get("gt", 0.0)
+        syn = res.get("syn_ood", 0.0)
+
+        ratio = syn / gt if gt != 0 else 0.0
+        res["ratio"] = float(ratio)
+
+        return res
+
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
+    def evaluate_default(
+            self,
+            X_gt: DataLoader,
+            X_syn: DataLoader,
+    ) -> float:
+        res = self.evaluate(X_gt, X_syn)
+        return res["ratio"]

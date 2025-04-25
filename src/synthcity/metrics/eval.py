@@ -36,6 +36,7 @@ from .eval_privacy import (
     DomiasMIABNAF,
     DomiasMIAKDE,
     DomiasMIAPrior,
+    EpsilonIdentifiability,
     IdentifiabilityScore,
     kAnonymization,
     kMap,
@@ -105,9 +106,10 @@ standard_metrics = [
     SyntheticDetectionGMM,
     SyntheticDetectionLinear,
     # privacy tests
-    AdversarialAccuracy,
+#TODO:   AdversarialAccuracy
     DeltaPresence,
-    kAnonymization,
+#TODO:   EpsilonIdentifiability
+#TODO:   kAnonymization,
     kMap,
     lDiversityDistinct,
     IdentifiabilityScore,

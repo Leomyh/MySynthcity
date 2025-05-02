@@ -930,7 +930,7 @@ class PearsonCorrelation(StatisticalEvaluator):
         For each dataset, we compute an n×n distance matrix D where:
             D^X_{i,j} = d( col(X, i), col(X, j) )
             D^Z_{i,j} = d( col(Z, i), col(Z, j) )
-        with d(·,·) being a distance function (e.g., "euclidean"). Then, we extract the upper triangular
+        with d(·,·) being a distance function (e.g., "Euclidean"). Then, we extract the upper triangular
         (excluding the diagonal) elements from both matrices to form two one-dimensional vectors, and compute
         the Pearson correlation coefficient between these vectors.
 

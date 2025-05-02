@@ -18,6 +18,9 @@ from synthcity.metrics.eval_privacy import (
     kAnonymization,
     kMap,
     lDiversityDistinct,
+    AdversarialAccuracy,
+    EpsilonIdentifiability,
+    tCloseness,
 )
 from synthcity.plugins import Plugin, Plugins
 from synthcity.plugins.core.dataloader import GenericDataLoader, ImageDataLoader
@@ -34,6 +37,9 @@ from synthcity.plugins.core.dataloader import GenericDataLoader, ImageDataLoader
         DomiasMIABNAF,
         DomiasMIAKDE,
         DomiasMIAPrior,
+        AdversarialAccuracy,
+        EpsilonIdentifiability,
+        tCloseness,
     ],
 )
 @pytest.mark.parametrize("test_plugin", [Plugins().get("dummy_sampler")])

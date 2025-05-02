@@ -36,11 +36,12 @@ from .eval_privacy import (
     DomiasMIABNAF,
     DomiasMIAKDE,
     DomiasMIAPrior,
-#    EpsilonIdentifiability,
+    EpsilonIdentifiability,
     IdentifiabilityScore,
     kAnonymization,
     kMap,
     lDiversityDistinct,
+    tCloseness,
 )
 from .eval_sanity import (
     CloseValuesProbability,
@@ -106,9 +107,9 @@ standard_metrics = [
     SyntheticDetectionGMM,
     SyntheticDetectionLinear,
     # privacy tests
-#TODO:   AdversarialAccuracy
+    AdversarialAccuracy,
     DeltaPresence,
-#TODO:   EpsilonIdentifiability
+    EpsilonIdentifiability,
     kAnonymization,
     kMap,
     lDiversityDistinct,
@@ -116,6 +117,7 @@ standard_metrics = [
     DomiasMIABNAF,  # TODO: This takes too long to include as default
     DomiasMIAKDE,
     DomiasMIAPrior,
+    tCloseness,
 
 ]
 

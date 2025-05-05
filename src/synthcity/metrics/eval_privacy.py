@@ -786,11 +786,9 @@ class tCloseness(PrivacyEvaluator):
     """
 
     def __init__(self,
-                 sensitive_column: str = "sensitive",
                  n_clusters: int = 10,
                  **kwargs: Any) -> None:
         super().__init__(default_metric="t", **kwargs)
-        self.sensitive_column = sensitive_column
         self.n_clusters = n_clusters
 
     @staticmethod
@@ -808,14 +806,10 @@ class tCloseness(PrivacyEvaluator):
         df_real = X_gt.dataframe()
         df_synth = X_syn.dataframe()
 
-        if hasattr(X_gt, "sensitive_features") and X_gt.sensitive_features:
-            sens_feats = list(X_gt.sensitive_features)
-        else:
-            sens_feats = [self.sensitive_column]
-
+        sens_feats = getattr(X_gt, "sensitive_features", None)
+        if not sens_feats:
+            raise ValueError("DataLoader must declare at least one sensitive feature")
         sensitive_col = sens_feats[0]
-        if sensitive_col not in df_real.columns:
-            raise ValueError(f"Sensitive column {sensitive_col!r} not in real data")
 
         # Select a set of quasi-identifiers
         qid_cols = [c for c in df_real.columns if c not in sens_feats]

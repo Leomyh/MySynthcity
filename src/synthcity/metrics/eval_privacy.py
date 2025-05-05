@@ -786,9 +786,11 @@ class tCloseness(PrivacyEvaluator):
     """
 
     def __init__(self,
+                 sensitive_column: str = "sensitive",
                  n_clusters: int = 10,
                  **kwargs: Any) -> None:
         super().__init__(default_metric="t", **kwargs)
+        self.sensitive_column = sensitive_column
         self.n_clusters = n_clusters
 
     @staticmethod
@@ -799,6 +801,7 @@ class tCloseness(PrivacyEvaluator):
     def direction() -> str:
         return "minimize"
 
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
         if X_gt.type() == "images":
             raise ValueError("Metric not defined for images")
@@ -806,13 +809,17 @@ class tCloseness(PrivacyEvaluator):
         df_real = X_gt.dataframe()
         df_synth = X_syn.dataframe()
 
-        sens_feats = getattr(X_gt, "sensitive_features", None)
-        if not sens_feats:
-            raise ValueError("DataLoader must declare at least one sensitive feature")
+        loader_sens = getattr(X_gt, "sensitive_features", None) or []
+        if loader_sens:
+            sens_feats = list(loader_sens)
+        elif self.sensitive_column in df_real.columns:
+            sens_feats = [self.sensitive_column]
+        else:
+            sens_feats = [df_real.columns[-1]]
         sensitive_col = sens_feats[0]
 
         # Select a set of quasi-identifiers
-        qid_cols = [c for c in df_real.columns if c not in sens_feats]
+        qid_cols = _utils.get_features(X_gt, sens_feats)
         if not qid_cols:
             raise ValueError("No quasi‐identifier columns found")
 

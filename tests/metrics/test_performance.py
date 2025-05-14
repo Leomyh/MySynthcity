@@ -16,7 +16,6 @@ from synthcity.metrics.eval_performance import (
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,
     PerformanceEvaluatorXGB,
-    ReverseValidationMLP,
 )
 from synthcity.plugins import Plugin, Plugins
 from synthcity.plugins.core.dataloader import (
@@ -477,35 +476,6 @@ def test_evaluate_performance_time_series_survival(
 
     assert def_score == good_score["syn_id.c_index"] - good_score["syn_id.brier_score"]
 
-
-@pytest.mark.parametrize("test_plugin", [Plugins().get("marginal_distributions")])
-@pytest.mark.parametrize("task_type", ["classification", "regression"])
-def test_reverse_validation_mlp_combined(test_plugin: Plugin, task_type: str) -> None:
-
-    if task_type == "classification":
-        X, y = load_iris(return_X_y=True, as_frame=True)
-    else:
-        X, y = load_diabetes(return_X_y=True, as_frame=True)
-
-    X["target"] = y
-    Xloader = GenericDataLoader(X, target_column="target")
-
-    test_plugin.fit(Xloader)
-    X_gen = test_plugin.generate(500)
-
-    evaluator = ReverseValidationMLP(task_type=task_type, use_cache=False)
-    results = evaluator.evaluate(Xloader, X_gen)
-
-    assert "gt" in results
-    assert "syn_ood" in results
-    assert "ratio" in results
-
-    assert results["gt"] != 0
-    if results["gt"] > 0:
-        assert 0 <= results["ratio"] <= 1
-
-    default_score = evaluator.evaluate_default(Xloader, X_gen)
-    assert default_score == results["ratio"]
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux only for faster results")
 @pytest.mark.slow_1

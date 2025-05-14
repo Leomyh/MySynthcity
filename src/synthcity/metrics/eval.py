@@ -28,7 +28,6 @@ from .eval_performance import (
     PerformanceEvaluatorLinear,
     PerformanceEvaluatorMLP,
     PerformanceEvaluatorXGB,
-    ReverseValidationMLP,
 )
 from .eval_privacy import (
     AdversarialAccuracy,
@@ -100,7 +99,6 @@ standard_metrics = [
     AugmentationPerformanceEvaluatorMLP,
     AugmentationPerformanceEvaluatorXGB,
     FeatureImportanceRankDistance,
-    ReverseValidationMLP,
     # synthetic detection tests
     SyntheticDetectionXGB,
     SyntheticDetectionMLP,

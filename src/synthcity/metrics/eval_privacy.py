@@ -749,8 +749,7 @@ class EpsilonIdentifiability(PrivacyEvaluator):
         I_val = (r_hat < r).mean()
 
         return {
-            "I": 1.0 - I_val,          # higher ⇒ safer (farther)
-            "epsilon_violation": float(I_val),   # lower is good
+            "I": 1.0 - I_val,          # higher ⇒ safer
         }
 
     # -------- helper --------

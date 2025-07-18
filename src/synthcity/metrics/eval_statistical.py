@@ -924,20 +924,7 @@ class FrechetInceptionDistance(StatisticalEvaluator):
 
 class PearsonCorrelation(StatisticalEvaluator):
     """
-        Evaluates the Pearson correlation coefficient between two pairwise distance matrices
-        computed from real data (X) and synthetic data (Z).
-
-        For each dataset, we compute an n×n distance matrix D where:
-            D^X_{i,j} = d( col(X, i), col(X, j) )
-            D^Z_{i,j} = d( col(Z, i), col(Z, j) )
-        with d(·,·) being a distance function (e.g., "Euclidean"). Then, we extract the upper triangular
-        (excluding the diagonal) elements from both matrices to form two one-dimensional vectors, and compute
-        the Pearson correlation coefficient between these vectors.
-
-        Score Interpretation:
-            1.0  — Perfect linear correspondence between the distance structures.
-             0   — No correlation.
-            -1.0 — Perfect negative correlation.
+        Computes the paper’s γ(A,B) on the upper‐triangle of the real/synthetic pairwise‐distance matrices.
     """
 
     def __init__(self, metric: str = "euclidean", **kwargs: Any) -> None:
@@ -954,39 +941,57 @@ class PearsonCorrelation(StatisticalEvaluator):
         # Higher correlation is better
         return "maximize"
 
+    @staticmethod
+    def _mu(G: np.ndarray) -> float:
+        n = G.shape[0]
+        iu, ju = np.triu_indices(n, k=1)
+        vals = G[iu, ju]
+        return 2.0 / (n * (n - 1)) * vals.sum()
+
+    @staticmethod
+    def _sigma(G: np.ndarray) -> float:
+        n = G.shape[0]
+        iu, ju = np.triu_indices(n, k=1)
+        vals = G[iu, ju]
+        m = PearsonCorrelation._mu(G)
+        return np.sqrt(2.0 / (n * (n - 1)) * np.sum((vals - m) ** 2))
+
+    @staticmethod
+    def _gamma(A: np.ndarray, B: np.ndarray) -> float:
+        """
+        γ(A,B) = sum_{i<j} [(A_ij - μ(A)) / σ(A)] * [(B_ij - μ(B)) / σ(B)]
+        """
+        assert A.shape == B.shape and A.ndim == 2 and A.shape[0] == A.shape[1], \
+            "A, B must be same‐shape square matrices"
+        n = A.shape[0]
+        iu, ju = np.triu_indices(n, k=1)
+        a = A[iu, ju]
+        b = B[iu, ju]
+
+        mu_a = PearsonCorrelation._mu(A)
+        mu_b = PearsonCorrelation._mu(B)
+        sig_a = PearsonCorrelation._sigma(A)
+        sig_b = PearsonCorrelation._sigma(B)
+
+        return np.sum((a - mu_a) / sig_a * (b - mu_b) / sig_b)
+
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
         df_real = X.dataframe()
         df_syn = X_syn.dataframe()
-
-        # Compute the intersection of common columns (assuming identical schema)
-        common_columns = df_real.columns.intersection(df_syn.columns)
-        if len(common_columns) == 0:
+        common_cols = df_real.columns.intersection(df_syn.columns)
+        if len(common_cols) == 0:
             return {"marginal": 0.0}
 
-        # Restrict both dataframes to the common columns
-        df_real = df_real[common_columns]
-        df_syn = df_syn[common_columns]
+        data_real = df_real[common_cols].to_numpy().T  # [n_feats, n_samples]
+        data_syn = df_syn[common_cols].to_numpy().T
 
-        # Convert each DataFrame to a numpy array and transpose it,
-        # so that each row represents a feature vector (one column of the original DataFrame).
-        data_real = df_real.to_numpy().T  # shape: [n_features, n_samples]
-        data_syn = df_syn.to_numpy().T  # shape: [n_features, n_samples]
-
-        # Compute the pairwise distance matrices for real and synthetic data
-        # The resulting distance matrix is of shape [n_features, n_features]
+        #  pairwise‐distance matrix
         dist_real = metrics.pairwise_distances(data_real, metric=self.metric)
         dist_syn = metrics.pairwise_distances(data_syn, metric=self.metric)
 
-        # Extract the upper-triangular (excluding the diagonal) elements from each matrix.
-        n = dist_real.shape[0]
-        idx = np.triu_indices(n, k=1)
-        vec_real = dist_real[idx]
-        vec_syn = dist_syn[idx]
-
-        # Compute the Pearson correlation coefficient between the two 1D vectors.
-        gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
-        return {"marginal": float(gamma)}
+        score = PearsonCorrelation._gamma(dist_real, dist_syn)
+        return {"marginal": float(score)}
 
 
 class MatrixDistance(StatisticalEvaluator):

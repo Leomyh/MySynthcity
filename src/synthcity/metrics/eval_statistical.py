@@ -1002,6 +1002,10 @@ class MatrixDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def __init__(self,distance_metric: str = "correlation", **kwargs: Any):
+        if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS):
+            raise ValueError(
+                f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
+            )
         super().__init__(default_metric="score", **kwargs)
         self.distance_metric = distance_metric
 

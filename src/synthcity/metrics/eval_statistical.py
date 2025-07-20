@@ -1001,8 +1001,9 @@ class MatrixDistance(StatisticalEvaluator):
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(self, **kwargs: Any):
+    def __init__(self,distance_metric: str = "correlation", **kwargs: Any):
         super().__init__(default_metric="score", **kwargs)
+        self.distance_metric = distance_metric
 
     @staticmethod
     def name() -> str:
@@ -1034,8 +1035,8 @@ class MatrixDistance(StatisticalEvaluator):
         data_syn = df_syn.to_numpy().T
 
         # Pair‑wise Pearson dissimilarities (1 − correlation)
-        dist_real = metrics.pairwise_distances(data_real, metric="correlation")
-        dist_syn = metrics.pairwise_distances(data_syn, metric="correlation")
+        dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
+        dist_syn = metrics.pairwise_distances(data_syn, metric= self.distance_metric)
 
         # Vectorize the upper‑triangle (excluding the diagonal)
         n = dist_real.shape[0]
@@ -1063,9 +1064,10 @@ class DendrogramDistance(StatisticalEvaluator):
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(self, linkage_method: str = "complete", **kwargs: Any):
+    def __init__(self, linkage_method: str = "complete",distance_metric:str = "correlation", **kwargs: Any):
         super().__init__(default_metric="score", **kwargs)
         self.linkage_method = linkage_method
+        self.distance_metric = distance_metric
 
     @staticmethod
     def name() -> str:
@@ -1094,8 +1096,8 @@ class DendrogramDistance(StatisticalEvaluator):
         data_syn = df_syn.to_numpy().T
 
         # Pearson dissimilarity matrices
-        dist_real = metrics.pairwise_distances(data_real, metric="correlation")
-        dist_syn = metrics.pairwise_distances(data_syn, metric="correlation")
+        dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
+        dist_syn = metrics.pairwise_distances(data_syn, metric=self.distance_metric)
 
         # Condensed form (required by linkage)
         con_real = squareform(dist_real, checks=False)

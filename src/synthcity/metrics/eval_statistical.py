@@ -956,8 +956,8 @@ class PearsonCorrelation(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
-        df_real = X.dataframe()
-        df_syn = X_syn.dataframe()
+        df_real = X.dataframe().iloc[:, :-1]
+        df_syn = X_syn.dataframe().iloc[:, :-1]
 
         # Compute the intersection of common columns (assuming identical schema)
         common_columns = df_real.columns.intersection(df_syn.columns)
@@ -1002,7 +1002,7 @@ class MatrixDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def __init__(self,distance_metric: str = "correlation", **kwargs: Any):
-        if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS):
+        if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS or distance_metric is not None):
             raise ValueError(
                 f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
             )
@@ -1020,8 +1020,8 @@ class MatrixDistance(StatisticalEvaluator):
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
         # 1) Load the dataframes
-        df_real = X.dataframe()
-        df_syn = X_syn.dataframe()
+        df_real = X.dataframe().iloc[:, :-1]
+        df_syn = X_syn.dataframe().iloc[:, :-1]
 
         # Align to common columns if schema differs
         if df_real.shape[1] != df_syn.shape[1]:
@@ -1069,6 +1069,19 @@ class DendrogramDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def __init__(self, linkage_method: str = "complete",distance_metric:str = "correlation", **kwargs: Any):
+
+        VALID_LINKAGE_METHODS = ["single", "complete", "average", "ward", "weighted", "centroid", "median"]
+
+        if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS or distance_metric is not None):
+            raise ValueError(
+                f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
+            )
+
+        if not (callable(linkage_method) or linkage_method in VALID_LINKAGE_METHODS):
+            raise ValueError(
+                f"Invalid linkage method: '{linkage_method}'. Must be one of: {VALID_LINKAGE_METHODS}"
+            )
+
         super().__init__(default_metric="score", **kwargs)
         self.linkage_method = linkage_method
         self.distance_metric = distance_metric
@@ -1083,8 +1096,8 @@ class DendrogramDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
-        df_real = X.dataframe()
-        df_syn = X_syn.dataframe()
+        df_real = X.dataframe().iloc[:, :-1]
+        df_syn = X_syn.dataframe().iloc[:, :-1]
 
         if df_real.shape[1] != df_syn.shape[1]:
             log.warning(
@@ -1182,8 +1195,8 @@ class TFTGSimilarity(StatisticalEvaluator):
                     "Pass it to the constructor or use a DataLoader that provides `.grn()`."
                 )
 
-        df_real = X.dataframe()
-        df_syn = X_syn.dataframe()
+        df_real = X.dataframe().iloc[:, :-1]
+        df_syn = X_syn.dataframe().iloc[:, :-1]
 
         num, den = 0.0, 0.0  # accumulators for weighted average
 
@@ -1288,8 +1301,8 @@ class TGTGSimilarity(StatisticalEvaluator):
                     "TFTGSimilarity needs a GRN. "
                     "Pass it to the constructor or use a DataLoader that provides `.grn()`."
                 )
-        df_real = X.dataframe()
-        df_syn = X_syn.dataframe()
+        df_real = X.dataframe().iloc[:, :-1]
+        df_syn = X_syn.dataframe().iloc[:, :-1]
 
         num, den = 0.0, 0.0
 

@@ -1081,17 +1081,12 @@ class DendrogramDistance(StatisticalEvaluator):
         _, dist_real = cophenet(tree_real, con_real)
         _, dist_syn = cophenet(tree_syn, con_syn)
 
-        # Vectorize the upper‑triangle (excluding the diagonal)
-        n = dist_real.shape[0]
-        idx = np.triu_indices(n, k=1)
-        vec_real = dist_real[idx]
-        vec_syn = dist_syn[idx]
 
         # Pearson correlation between the two cophenetic‑distance vectors
-        if vec_real.std() == 0 or vec_syn.std() == 0:
+        if dist_real.std() == 0 or dist_syn.std() == 0:
             gamma = 0.0
         else:
-            gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
+            gamma = np.corrcoef(dist_real, dist_syn)[0, 1]
 
         return {"marginal": float(gamma)}
 

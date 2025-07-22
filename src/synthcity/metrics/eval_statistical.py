@@ -922,7 +922,8 @@ class FrechetInceptionDistance(StatisticalEvaluator):
         }
 
 
-class PearsonCorrelation(StatisticalEvaluator):
+
+class MatrixDistance(StatisticalEvaluator):
     """
         Evaluates the Pearson correlation coefficient between two pairwise distance matrices
         computed from real data (X) and synthetic data (Z).
@@ -940,73 +941,13 @@ class PearsonCorrelation(StatisticalEvaluator):
             -1.0 — Perfect negative correlation.
     """
 
-    def __init__(self, metric: str = "euclidean", **kwargs: Any) -> None:
-        # Set default_metric as "marginal" for compatibility with the framework
-        super().__init__(default_metric="marginal", **kwargs)
-        self.metric = metric
-
-    @staticmethod
-    def name() -> str:
-        return "pearson_dist_corr"
-
-    @staticmethod
-    def direction() -> str:
-        # Higher correlation is better
-        return "maximize"
-
-    @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
-        df_real = X.dataframe().iloc[:, :-1]
-        df_syn = X_syn.dataframe().iloc[:, :-1]
-
-        # Compute the intersection of common columns (assuming identical schema)
-        common_columns = df_real.columns.intersection(df_syn.columns)
-        if len(common_columns) == 0:
-            return {"marginal": 0.0}
-
-        # Restrict both dataframes to the common columns
-        df_real = df_real[common_columns]
-        df_syn = df_syn[common_columns]
-
-        # Convert each DataFrame to a numpy array and transpose it,
-        # so that each row represents a feature vector (one column of the original DataFrame).
-        data_real = df_real.to_numpy().T  # shape: [n_features, n_samples]
-        data_syn = df_syn.to_numpy().T  # shape: [n_features, n_samples]
-
-        # Compute the pairwise distance matrices for real and synthetic data
-        # The resulting distance matrix is of shape [n_features, n_features]
-        dist_real = metrics.pairwise_distances(data_real, metric=self.metric)
-        dist_syn = metrics.pairwise_distances(data_syn, metric=self.metric)
-
-        # Extract the upper-triangular (excluding the diagonal) elements from each matrix.
-        n = dist_real.shape[0]
-        idx = np.triu_indices(n, k=1)
-        vec_real = dist_real[idx]
-        vec_syn = dist_syn[idx]
-
-        # Compute the Pearson correlation coefficient between the two 1D vectors.
-        gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
-        return {"marginal": float(gamma)}
-
-
-class MatrixDistance(StatisticalEvaluator):
-    """
-      1) Build D^X and D^Z, two n×n matrices of Pearson dissimilarities
-         between each pair of columns (i.e. 1–rho(col_i, col_j)).
-      2) Vectorize their upper‑triangle entries (i<j).
-      3) Return gamma(D^X, D^Z) = PearsonCorr( vec(D^X), vec(D^Z) ).
-
-    Returns:
-        {"score": S_dist} in [–1, +1].
-    """
-
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def __init__(self,distance_metric: str = "correlation", **kwargs: Any):
         if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS or distance_metric is not None):
             raise ValueError(
                 f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
             )
-        super().__init__(default_metric="score", **kwargs)
+        super().__init__(default_metric="marginal", **kwargs)
         self.distance_metric = distance_metric
 
     @staticmethod
@@ -1019,7 +960,7 @@ class MatrixDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
-        # 1) Load the dataframes
+        # Load the dataframes
         df_real = X.dataframe().iloc[:, :-1]
         df_syn = X_syn.dataframe().iloc[:, :-1]
 
@@ -1029,16 +970,21 @@ class MatrixDistance(StatisticalEvaluator):
                 "Real/synthetic sets have different numbers of columns; "
                 "restricting to their intersection."
             )
-            common_columns = df_real.columns.intersection(df_syn.columns)
-            # Restrict both dataframes to the common columns
-            df_real = df_real[common_columns]
-            df_syn = df_syn[common_columns]
+
+        common_columns = df_real.columns.intersection(df_syn.columns)
+        if len(common_columns) == 0:
+            return {"marginal": 0.0}
+
+        # Restrict both dataframes to the common columns
+        df_real = df_real[common_columns]
+        df_syn = df_syn[common_columns]
 
         # Convert to [n_features, n_samples] so pairwise distances are over genes
         data_real = df_real.to_numpy().T  # [n_features, n_samples]
         data_syn = df_syn.to_numpy().T
 
-        # Pair‑wise Pearson dissimilarities (1 − correlation)
+        # Compute the pairwise distance matrices for real and synthetic data
+        # The resulting distance matrix is of shape [n_features, n_features]
         dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
         dist_syn = metrics.pairwise_distances(data_syn, metric= self.distance_metric)
 
@@ -1054,17 +1000,17 @@ class MatrixDistance(StatisticalEvaluator):
         else:
             gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
 
-        return {"score": float(gamma)}
+        return {"marginal": float(gamma)}
 
 
 class DendrogramDistance(StatisticalEvaluator):
     """
-      1) From the same D^X, D^Z build two linkage trees.
-      2) Compute their cophenetic‑distance vectors (length = n(n–1)/2).
-      3) Return gamma between those two vectors.
+          1) From the same D^X, D^Z build two linkage trees.
+          2) Compute their cophenetic‑distance vectors (length = n(n–1)/2).
+          3) Return gamma between those two vectors.
 
     Returns:
-        {"score": S_dend} in [–1, +1].
+        {"marginal": S_dend} in [–1, +1].
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
@@ -1077,12 +1023,12 @@ class DendrogramDistance(StatisticalEvaluator):
                 f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
             )
 
-        if not (callable(linkage_method) or linkage_method in VALID_LINKAGE_METHODS):
+        if not (callable(linkage_method) or linkage_method in VALID_LINKAGE_METHODS or linkage_method is not None):
             raise ValueError(
                 f"Invalid linkage method: '{linkage_method}'. Must be one of: {VALID_LINKAGE_METHODS}"
             )
 
-        super().__init__(default_metric="score", **kwargs)
+        super().__init__(default_metric="marginal", **kwargs)
         self.linkage_method = linkage_method
         self.distance_metric = distance_metric
 
@@ -1096,6 +1042,7 @@ class DendrogramDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
+        #  Load the dataframes
         df_real = X.dataframe().iloc[:, :-1]
         df_syn = X_syn.dataframe().iloc[:, :-1]
 
@@ -1104,15 +1051,21 @@ class DendrogramDistance(StatisticalEvaluator):
                 "Real/synthetic sets have different numbers of columns; "
                 "restricting to their intersection."
             )
-            common_columns = df_real.columns.intersection(df_syn.columns)
-            # Restrict both dataframes to the common columns
-            df_real = df_real[common_columns]
-            df_syn = df_syn[common_columns]
 
+        common_columns = df_real.columns.intersection(df_syn.columns)
+        if len(common_columns) == 0:
+            return {"marginal": 0.0}
+
+        # Restrict both dataframes to the common columns
+        df_real = df_real[common_columns]
+        df_syn = df_syn[common_columns]
+
+        # Convert to [n_features, n_samples] so pairwise distances are over genes
         data_real = df_real.to_numpy().T
         data_syn = df_syn.to_numpy().T
 
-        # Pearson dissimilarity matrices
+        # Compute the pairwise distance matrices for real and synthetic data
+        # The resulting distance matrix is of shape [n_features, n_features]
         dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
         dist_syn = metrics.pairwise_distances(data_syn, metric=self.distance_metric)
 
@@ -1128,13 +1081,19 @@ class DendrogramDistance(StatisticalEvaluator):
         _, dist_real = cophenet(tree_real, con_real)
         _, dist_syn = cophenet(tree_syn, con_syn)
 
+        # Vectorize the upper‑triangle (excluding the diagonal)
+        n = dist_real.shape[0]
+        idx = np.triu_indices(n, k=1)
+        vec_real = dist_real[idx]
+        vec_syn = dist_syn[idx]
+
         # Pearson correlation between the two cophenetic‑distance vectors
-        if dist_real.std() == 0 or dist_syn.std() == 0:
+        if vec_real.std() == 0 or vec_syn.std() == 0:
             gamma = 0.0
         else:
-            gamma = np.corrcoef(dist_real, dist_syn)[0, 1]
+            gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
 
-        return {"score": float(gamma)}
+        return {"marginal": float(gamma)}
 
 
 class TFTGSimilarity(StatisticalEvaluator):

@@ -22,7 +22,6 @@ from synthcity.metrics.eval_statistical import (
     PRDCScore,
     SurvivalKMDistance,
     WassersteinDistance,
-    PearsonCorrelation,
     MatrixDistance,
     DendrogramDistance,
     TFTGSimilarity,
@@ -327,25 +326,6 @@ def test_image_support() -> None:
             assert not np.isnan(score[k]), evaluator
 
 
-@pytest.mark.parametrize("test_plugin", [Plugins().get("dummy_sampler")])
-def test_evaluate_pearson_correlation(test_plugin: Plugin) -> None:
-    X, y = load_diabetes(return_X_y=True, as_frame=True)
-    X["target"] = y
-    Xloader = GenericDataLoader(X)
-
-    test_plugin.fit(Xloader)
-    X_gen = test_plugin.generate(1000)
-
-    syn_score, rnd_score = _eval_plugin(PearsonCorrelation, Xloader, X_gen)
-    for key in syn_score:
-        # range in [-1,1]；good ≥ random
-        assert -1 <= syn_score[key] <= 1
-        assert -1 <= rnd_score[key] <= 1
-        assert syn_score[key] >= rnd_score[key]
-
-    assert PearsonCorrelation.name() == "pearson_dist_corr"
-    assert PearsonCorrelation.type() == "stats"
-    assert PearsonCorrelation.direction() == "maximize"
 
 @pytest.mark.parametrize("test_plugin", [Plugins().get("dummy_sampler")])
 def test_evaluate_matrix_distance(test_plugin: Plugin) -> None:

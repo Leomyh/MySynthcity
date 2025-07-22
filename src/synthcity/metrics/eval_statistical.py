@@ -941,7 +941,7 @@ class MatrixDistance(StatisticalEvaluator):
             -1.0 — Perfect negative correlation.
     """
 
-    #@validate_arguments(config=dict(arbitrary_types_allowed=True))
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def __init__(self,distance_metric: str = "correlation", **kwargs: Any):
         if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS or distance_metric is not None):
             raise ValueError(

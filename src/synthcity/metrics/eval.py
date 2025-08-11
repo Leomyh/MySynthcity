@@ -53,11 +53,11 @@ from .eval_statistical import (
     AlphaPrecision,
     ChiSquaredTest,
     DendrogramDistance,
-    MatrixDistance,
     FrechetInceptionDistance,
     InverseKLDivergence,
     JensenShannonDistance,
     KolmogorovSmirnovTest,
+    MatrixDistance,
     MaximumMeanDiscrepancy,
     PRDCScore,
     SurvivalKMDistance,
@@ -114,7 +114,6 @@ standard_metrics = [
     DomiasMIAKDE,
     DomiasMIAPrior,
     tCloseness,
-
 ]
 
 

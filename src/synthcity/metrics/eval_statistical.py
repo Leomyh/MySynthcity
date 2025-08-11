@@ -10,7 +10,7 @@ import torch
 from geomloss import SamplesLoss
 from pydantic import validate_arguments
 from scipy import linalg
-from scipy.cluster.hierarchy import linkage, cophenet, dendrogram, fcluster, to_tree
+from scipy.cluster.hierarchy import cophenet, dendrogram, fcluster, linkage, to_tree
 from scipy.spatial.distance import jensenshannon, squareform
 from scipy.special import kl_div
 from scipy.stats import chisquare, ks_2samp
@@ -51,8 +51,8 @@ class StatisticalEvaluator(MetricEvaluator):
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
         cache_file = (
-                self._workspace
-                / f"sc_metric_cache_{self.type()}_{self.name()}_{X_gt.hash()}_{X_syn.hash()}_{self._reduction}_{platform.python_version()}.bkp"
+            self._workspace
+            / f"sc_metric_cache_{self.type()}_{self.name()}_{X_gt.hash()}_{X_syn.hash()}_{self._reduction}_{platform.python_version()}.bkp"
         )
         if self.use_cache(cache_file):
             return load_from_file(cache_file)
@@ -64,9 +64,9 @@ class StatisticalEvaluator(MetricEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def evaluate_default(
-            self,
-            X_gt: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X_gt: DataLoader,
+        X_syn: DataLoader,
     ) -> float:
         return self.evaluate(X_gt, X_syn)[self._default_metric]
 
@@ -220,9 +220,9 @@ class MaximumMeanDiscrepancy(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(
-            self,
-            X_gt: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X_gt: DataLoader,
+        X_syn: DataLoader,
     ) -> Dict:
         if self.kernel == "linear":
             """
@@ -307,9 +307,9 @@ class JensenShannonDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate_stats(
-            self,
-            X_gt: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X_gt: DataLoader,
+        X_syn: DataLoader,
     ) -> Tuple[Dict, Dict, Dict]:
         stats_gt = {}
         stats_syn = {}
@@ -338,9 +338,9 @@ class JensenShannonDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(
-            self,
-            X_gt: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X_gt: DataLoader,
+        X_syn: DataLoader,
     ) -> Dict:
         stats_, _, _ = self._evaluate_stats(X_gt, X_syn)
 
@@ -375,9 +375,9 @@ class WassersteinDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(
-            self,
-            X: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X: DataLoader,
+        X_syn: DataLoader,
     ) -> Dict:
         X_ = X.numpy().reshape(len(X), -1)
         X_syn_ = X_syn.numpy().reshape(len(X_syn), -1)
@@ -426,9 +426,9 @@ class PRDCScore(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(
-            self,
-            X: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X: DataLoader,
+        X_syn: DataLoader,
     ) -> Dict:
         X_ = X.numpy().reshape(len(X), -1)
         X_syn_ = X_syn.numpy().reshape(len(X_syn), -1)
@@ -439,7 +439,7 @@ class PRDCScore(StatisticalEvaluator):
         return results
 
     def _compute_pairwise_distance(
-            self, data_x: np.ndarray, data_y: Optional[np.ndarray] = None
+        self, data_x: np.ndarray, data_y: Optional[np.ndarray] = None
     ) -> np.ndarray:
         """
         Args:
@@ -455,7 +455,7 @@ class PRDCScore(StatisticalEvaluator):
         return dists
 
     def _get_kth_value(
-            self, unsorted: np.ndarray, k: int, axis: int = -1
+        self, unsorted: np.ndarray, k: int, axis: int = -1
     ) -> np.ndarray:
         """
         Args:
@@ -470,7 +470,7 @@ class PRDCScore(StatisticalEvaluator):
         return kth_values
 
     def _compute_nearest_neighbour_distances(
-            self, input_features: np.ndarray, nearest_k: int
+        self, input_features: np.ndarray, nearest_k: int
     ) -> np.ndarray:
         """
         Args:
@@ -484,7 +484,7 @@ class PRDCScore(StatisticalEvaluator):
         return radii
 
     def _compute_prdc(
-            self, real_features: np.ndarray, fake_features: np.ndarray
+        self, real_features: np.ndarray, fake_features: np.ndarray
     ) -> Dict:
         """
         Computes precision, recall, density, and coverage given two manifolds.
@@ -507,8 +507,8 @@ class PRDCScore(StatisticalEvaluator):
 
         precision = (
             (
-                    distance_real_fake
-                    < np.expand_dims(real_nearest_neighbour_distances, axis=1)
+                distance_real_fake
+                < np.expand_dims(real_nearest_neighbour_distances, axis=1)
             )
             .any(axis=0)
             .mean()
@@ -516,20 +516,20 @@ class PRDCScore(StatisticalEvaluator):
 
         recall = (
             (
-                    distance_real_fake
-                    < np.expand_dims(fake_nearest_neighbour_distances, axis=0)
+                distance_real_fake
+                < np.expand_dims(fake_nearest_neighbour_distances, axis=0)
             )
             .any(axis=1)
             .mean()
         )
 
         density = (1.0 / float(self.nearest_k)) * (
-                distance_real_fake
-                < np.expand_dims(real_nearest_neighbour_distances, axis=1)
+            distance_real_fake
+            < np.expand_dims(real_nearest_neighbour_distances, axis=1)
         ).sum(axis=0).mean()
 
         coverage = (
-                distance_real_fake.min(axis=1) < real_nearest_neighbour_distances
+            distance_real_fake.min(axis=1) < real_nearest_neighbour_distances
         ).mean()
 
         return dict(
@@ -568,10 +568,10 @@ class AlphaPrecision(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def metrics(
-            self,
-            X: np.ndarray,
-            X_syn: np.ndarray,
-            emb_center: Optional[np.ndarray] = None,
+        self,
+        X: np.ndarray,
+        X_syn: np.ndarray,
+        emb_center: Optional[np.ndarray] = None,
     ) -> Tuple:
         if len(X) != len(X_syn):
             raise RuntimeError("The real and synthetic data must have the same length")
@@ -615,8 +615,8 @@ class AlphaPrecision(StatisticalEvaluator):
 
             beta_coverage = np.mean(
                 (
-                        (real_to_synth <= real_to_real)
-                        * (real_synth_closest_d <= closest_synth_Radii[k])
+                    (real_to_synth <= real_to_real)
+                    * (real_synth_closest_d <= closest_synth_Radii[k])
                 )
             )
 
@@ -652,9 +652,9 @@ class AlphaPrecision(StatisticalEvaluator):
         )
 
     def _normalize_covariates(
-            self,
-            X: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X: DataLoader,
+        X_syn: DataLoader,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """_normalize_covariates
         This is an internal method to replicate the old, naive method for evaluating
@@ -707,9 +707,9 @@ class AlphaPrecision(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(
-            self,
-            X: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X: DataLoader,
+        X_syn: DataLoader,
     ) -> Dict:
         results = {}
 
@@ -773,9 +773,9 @@ class SurvivalKMDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(
-            self,
-            X: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X: DataLoader,
+        X_syn: DataLoader,
     ) -> Dict:
         if self._task_type != "survival_analysis":
             raise RuntimeError(
@@ -839,12 +839,12 @@ class FrechetInceptionDistance(StatisticalEvaluator):
         return mu, sigma
 
     def _calculate_frechet_distance(
-            self,
-            mu1: np.ndarray,
-            sigma1: np.ndarray,
-            mu2: np.ndarray,
-            sigma2: np.ndarray,
-            eps: float = 1e-6,
+        self,
+        mu1: np.ndarray,
+        sigma1: np.ndarray,
+        mu2: np.ndarray,
+        sigma2: np.ndarray,
+        eps: float = 1e-6,
     ) -> float:
         """Numpy implementation of the Frechet Distance.
         The Frechet distance between two multivariate Gaussians X_1 ~ N(mu_1, C_1)
@@ -901,9 +901,9 @@ class FrechetInceptionDistance(StatisticalEvaluator):
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(
-            self,
-            X: DataLoader,
-            X_syn: DataLoader,
+        self,
+        X: DataLoader,
+        X_syn: DataLoader,
     ) -> Dict:
         if X.type() != "images":
             raise RuntimeError(
@@ -922,28 +922,31 @@ class FrechetInceptionDistance(StatisticalEvaluator):
         }
 
 
-
 class MatrixDistance(StatisticalEvaluator):
     """
-        Evaluates the Pearson correlation coefficient between two pairwise distance matrices
-        computed from real data (X) and synthetic data (Z).
+    Evaluates the Pearson correlation coefficient between two pairwise distance matrices
+    computed from real data (X) and synthetic data (Z).
 
-        For each dataset, we compute an n×n distance matrix D where:
-            D^X_{i,j} = d( col(X, i), col(X, j) )
-            D^Z_{i,j} = d( col(Z, i), col(Z, j) )
-        with d(·,·) being a distance function (e.g., "Euclidean"). Then, we extract the upper triangular
-        (excluding the diagonal) elements from both matrices to form two one-dimensional vectors, and compute
-        the Pearson correlation coefficient between these vectors.
+    For each dataset, we compute an n×n distance matrix D where:
+        D^X_{i,j} = d( col(X, i), col(X, j) )
+        D^Z_{i,j} = d( col(Z, i), col(Z, j) )
+    with d(·,·) being a distance function (e.g., "Euclidean"). Then, we extract the upper triangular
+    (excluding the diagonal) elements from both matrices to form two one-dimensional vectors, and compute
+    the Pearson correlation coefficient between these vectors.
 
-        Score Interpretation:
-            1.0  — Perfect linear correspondence between the distance structures.
-             0   — No correlation.
-            -1.0 — Perfect negative correlation.
+    Score Interpretation:
+        1.0  — Perfect linear correspondence between the distance structures.
+         0   — No correlation.
+        -1.0 — Perfect negative correlation.
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(self,distance_metric: str = "correlation", **kwargs: Any):
-        if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS or distance_metric is not None):
+    def __init__(self, distance_metric: str = "correlation", **kwargs: Any):
+        if not (
+            callable(distance_metric)
+            or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
+            or distance_metric is not None
+        ):
             raise ValueError(
                 f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
             )
@@ -986,7 +989,7 @@ class MatrixDistance(StatisticalEvaluator):
         # Compute the pairwise distance matrices for real and synthetic data
         # The resulting distance matrix is of shape [n_features, n_features]
         dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
-        dist_syn = metrics.pairwise_distances(data_syn, metric= self.distance_metric)
+        dist_syn = metrics.pairwise_distances(data_syn, metric=self.distance_metric)
 
         # Vectorize the upper‑triangle (excluding the diagonal)
         n = dist_real.shape[0]
@@ -1014,16 +1017,37 @@ class DendrogramDistance(StatisticalEvaluator):
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(self, linkage_method: str = "complete",distance_metric:str = "correlation", **kwargs: Any):
+    def __init__(
+        self,
+        linkage_method: str = "complete",
+        distance_metric: str = "correlation",
+        **kwargs: Any,
+    ):
 
-        VALID_LINKAGE_METHODS = ["single", "complete", "average", "ward", "weighted", "centroid", "median"]
+        VALID_LINKAGE_METHODS = [
+            "single",
+            "complete",
+            "average",
+            "ward",
+            "weighted",
+            "centroid",
+            "median",
+        ]
 
-        if not (callable(distance_metric) or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS or distance_metric is not None):
+        if not (
+            callable(distance_metric)
+            or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
+            or distance_metric is not None
+        ):
             raise ValueError(
                 f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
             )
 
-        if not (callable(linkage_method) or linkage_method in VALID_LINKAGE_METHODS or linkage_method is not None):
+        if not (
+            callable(linkage_method)
+            or linkage_method in VALID_LINKAGE_METHODS
+            or linkage_method is not None
+        ):
             raise ValueError(
                 f"Invalid linkage method: '{linkage_method}'. Must be one of: {VALID_LINKAGE_METHODS}"
             )
@@ -1081,7 +1105,6 @@ class DendrogramDistance(StatisticalEvaluator):
         _, dist_real = cophenet(tree_real, con_real)
         _, dist_syn = cophenet(tree_syn, con_syn)
 
-
         # Pearson correlation between the two cophenetic‑distance vectors
         if dist_real.std() == 0 or dist_syn.std() == 0:
             gamma = 0.0
@@ -1093,36 +1116,36 @@ class DendrogramDistance(StatisticalEvaluator):
 
 class TFTGSimilarity(StatisticalEvaluator):
     """
-        Weighted‑sum TF–TG similarity  (S_TF‑TG  ∈ [‑1, 1]).
+    Weighted‑sum TF–TG similarity  (S_TF‑TG  ∈ [‑1, 1]).
 
-        Let
-            r_f^D = ( d(col(D, f), col(D, g))  for g in G(f) )
-        be the vector of distances between TF *f* and each of its target genes for dataset *D* (real = X, synthetic = Z).
+    Let
+        r_f^D = ( d(col(D, f), col(D, g))  for g in G(f) )
+    be the vector of distances between TF *f* and each of its target genes for dataset *D* (real = X, synthetic = Z).
 
-        The metric:
-            S_TF‑TG = ( Σ_f w_f · cos( r_f^X , r_f^Z ) ) / Σ_f w_f
+    The metric:
+        S_TF‑TG = ( Σ_f w_f · cos( r_f^X , r_f^Z ) ) / Σ_f w_f
 
-        Arguments
-        ----------
-        grn : Dict[str, List[str]]
-            Prior gene‑regulatory network.
-            Key   = column name of a TF.
-            Value = list of column names of its target genes (TGs).
-        distance : str, default "correlation"
-            Distance metric *d(·,·)* used between expression vectors.
-            "correlation" → Pearson dissimilarity (1 − ρ); otherwise delegates to ``sklearn.metrics.pairwise_distances``.
-        weighting : {"degree", "uniform"}, default "degree"
-            How to choose TF weights *w_f*:
-                "degree"  → w_f = |G(f)|   (number of TGs),
-                "uniform" → w_f = 1.
+    Arguments
+    ----------
+    grn : Dict[str, List[str]]
+        Prior gene‑regulatory network.
+        Key   = column name of a TF.
+        Value = list of column names of its target genes (TGs).
+    distance : str, default "correlation"
+        Distance metric *d(·,·)* used between expression vectors.
+        "correlation" → Pearson dissimilarity (1 − ρ); otherwise delegates to ``sklearn.metrics.pairwise_distances``.
+    weighting : {"degree", "uniform"}, default "degree"
+        How to choose TF weights *w_f*:
+            "degree"  → w_f = |G(f)|   (number of TGs),
+            "uniform" → w_f = 1.
     """
 
     def __init__(
-            self,
-            grn: Optional [Dict[str, list]] = None,
-            distance: str = "correlation",
-            weighting: str = "degree",
-            **kwargs: Any,
+        self,
+        grn: Optional[Dict[str, list]] = None,
+        distance: str = "correlation",
+        weighting: str = "degree",
+        **kwargs: Any,
     ):
         super().__init__(default_metric="score", **kwargs)
         self.grn = grn
@@ -1160,19 +1183,25 @@ class TFTGSimilarity(StatisticalEvaluator):
                 continue
 
             # Keep only TGs present in both datasets
-            valid_tgs = [g for g in tgs if (g in df_real.columns) and (g in df_syn.columns)]
+            valid_tgs = [
+                g for g in tgs if (g in df_real.columns) and (g in df_syn.columns)
+            ]
             if len(valid_tgs) == 0:
                 continue
 
             # r_f^D   (length = |G(f)|)
             r_real = np.array(
-                [self._pair_distance(df_real[tf].to_numpy(), df_real[g].to_numpy())
-                 for g in valid_tgs],
+                [
+                    self._pair_distance(df_real[tf].to_numpy(), df_real[g].to_numpy())
+                    for g in valid_tgs
+                ],
                 dtype=float,
             )
             r_syn = np.array(
-                [self._pair_distance(df_syn[tf].to_numpy(), df_syn[g].to_numpy())
-                 for g in valid_tgs],
+                [
+                    self._pair_distance(df_syn[tf].to_numpy(), df_syn[g].to_numpy())
+                    for g in valid_tgs
+                ],
                 dtype=float,
             )
 
@@ -1187,7 +1216,7 @@ class TFTGSimilarity(StatisticalEvaluator):
     # ---------- helpers ----------
     def _pair_distance(self, x: np.ndarray, y: np.ndarray) -> float:
         """
-            Compute d(x, y) for two 1‑D expression vectors.
+        Compute d(x, y) for two 1‑D expression vectors.
         """
         return float(
             metrics.pairwise_distances(
@@ -1197,7 +1226,7 @@ class TFTGSimilarity(StatisticalEvaluator):
 
     def _cosine(self, a: np.ndarray, b: np.ndarray) -> float:
         """
-            Cosine similarity between two vectors; returns 0 if any norm is 0.
+        Cosine similarity between two vectors; returns 0 if any norm is 0.
         """
         na, nb = np.linalg.norm(a), np.linalg.norm(b)
         if na == 0 or nb == 0:
@@ -1207,28 +1236,28 @@ class TFTGSimilarity(StatisticalEvaluator):
 
 class TGTGSimilarity(StatisticalEvaluator):
     """
-        Weighted‑sum TG–TG similarity  (S_TG‑TG  ∈ [‑1, 1]).
+    Weighted‑sum TG–TG similarity  (S_TG‑TG  ∈ [‑1, 1]).
 
-        For each TF *f* and each of its TGs *g € G(f)* define
-            q_{f,g}^D = ( d(col(D, g), col(D, i))  for i in G(f) \\ {g} ).
+    For each TF *f* and each of its TGs *g € G(f)* define
+        q_{f,g}^D = ( d(col(D, g), col(D, i))  for i in G(f) \\ {g} ).
 
-        The metric:
-            S_TG‑TG = ( Σ_f w_f · Σ_{g∈G(f)} cos( q_{f,g}^X , q_{f,g}^Z ) )
-                      / ( Σ_f w_f · |G(f)| )
+    The metric:
+        S_TG‑TG = ( Σ_f w_f · Σ_{g∈G(f)} cos( q_{f,g}^X , q_{f,g}^Z ) )
+                  / ( Σ_f w_f · |G(f)| )
 
-        Parameters
-        ----------
-        grn       : same as above
-        distance  : same as above
-        weighting : same as above
+    Parameters
+    ----------
+    grn       : same as above
+    distance  : same as above
+    weighting : same as above
     """
 
     def __init__(
-            self,
-            grn: Optional [Dict[str, list]] = None,
-            distance: str = "correlation",
-            weighting: str = "degree",
-            **kwargs: Any,
+        self,
+        grn: Optional[Dict[str, list]] = None,
+        distance: str = "correlation",
+        weighting: str = "degree",
+        **kwargs: Any,
     ):
         super().__init__(default_metric="score", **kwargs)
         self.grn = grn
@@ -1283,9 +1312,7 @@ class TGTGSimilarity(StatisticalEvaluator):
                 )
                 q_syn = np.array(
                     [
-                        self._pair_distance(
-                            df_syn[g].to_numpy(), df_syn[i].to_numpy()
-                        )
+                        self._pair_distance(df_syn[g].to_numpy(), df_syn[i].to_numpy())
                         for i in others
                     ],
                     dtype=float,

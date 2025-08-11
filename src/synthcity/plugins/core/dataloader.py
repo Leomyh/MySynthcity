@@ -1821,6 +1821,7 @@ def create_from_info(
     else:
         raise RuntimeError(f"invalid datatype {info}")
 
+
 class GeneExpressionDataLoader(GenericDataLoader):
     """
     Generic tabular loader with an attached GRN.
@@ -1834,7 +1835,7 @@ class GeneExpressionDataLoader(GenericDataLoader):
         self,
         data: Union[pd.DataFrame, list, np.ndarray],
         grn: Dict[str, List[str]],
-        **gd_kwargs: Any,              # the rest is same as GenericDataLoader
+        **gd_kwargs: Any,  # the rest is same as GenericDataLoader
     ) -> None:
         super().__init__(data, **gd_kwargs)
         self._grn = grn

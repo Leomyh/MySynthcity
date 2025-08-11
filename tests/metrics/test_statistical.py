@@ -1,37 +1,37 @@
 # stdlib
 import sys
-from typing import Any, Tuple, Type, Dict, List
+from typing import Any, Dict, List, Tuple, Type
 
 # third party
 import numpy as np
 import pandas as pd
 import pytest
 from lifelines.datasets import load_rossi
-from sklearn.datasets import load_iris,load_diabetes
+from sklearn.datasets import load_diabetes, load_iris
 from torchvision import datasets
 
 # synthcity absolute
 from synthcity.metrics.eval_statistical import (
     AlphaPrecision,
     ChiSquaredTest,
+    DendrogramDistance,
     FrechetInceptionDistance,
     InverseKLDivergence,
     JensenShannonDistance,
     KolmogorovSmirnovTest,
+    MatrixDistance,
     MaximumMeanDiscrepancy,
     PRDCScore,
     SurvivalKMDistance,
-    WassersteinDistance,
-    MatrixDistance,
-    DendrogramDistance,
     TFTGSimilarity,
     TGTGSimilarity,
+    WassersteinDistance,
 )
 from synthcity.plugins import Plugin, Plugins
 from synthcity.plugins.core.dataloader import (
     DataLoader,
-    GenericDataLoader,
     GeneExpressionDataLoader,
+    GenericDataLoader,
     ImageDataLoader,
     SurvivalAnalysisDataLoader,
     create_from_info,
@@ -326,7 +326,6 @@ def test_image_support() -> None:
             assert not np.isnan(score[k]), evaluator
 
 
-
 @pytest.mark.parametrize("test_plugin", [Plugins().get("dummy_sampler")])
 def test_evaluate_matrix_distance(test_plugin: Plugin) -> None:
     X, y = load_diabetes(return_X_y=True, as_frame=True)
@@ -367,25 +366,27 @@ def test_evaluate_dendrogram_distance(test_plugin: Plugin) -> None:
     assert DendrogramDistance.direction() == "maximize"
 
 
-
 def test_evaluate_tf_tg_similarity() -> None:
     np.random.seed(0)
     genes = ["TF1", "TF2", "G1", "G2", "G3", "G4"]
     real_df = pd.DataFrame(np.random.randn(80, len(genes)), columns=genes)
 
     # simple GRN
-    grn = {"TF1": ["G1", "G2", "G3"],
-           "TF2": ["G2", "G4"]}
+    grn = {"TF1": ["G1", "G2", "G3"], "TF2": ["G2", "G4"]}
 
     X_gt = GeneExpressionDataLoader(real_df, grn=grn)
     # "good" synthetic：small random noise
-    X_good = GeneExpressionDataLoader(real_df + 0.05 * np.random.randn(*real_df.shape), grn=grn)
+    X_good = GeneExpressionDataLoader(
+        real_df + 0.05 * np.random.randn(*real_df.shape), grn=grn
+    )
     # "bad" synthetic：completely random noise
-    X_bad  = GeneExpressionDataLoader(pd.DataFrame(np.random.randn(*real_df.shape), columns=genes), grn=grn)
+    X_bad = GeneExpressionDataLoader(
+        pd.DataFrame(np.random.randn(*real_df.shape), columns=genes), grn=grn
+    )
 
     ev = TFTGSimilarity(grn=grn, use_cache=False)
     good_score = ev.evaluate(X_gt, X_good)["score"]
-    bad_score  = ev.evaluate(X_gt, X_bad )["score"]
+    bad_score = ev.evaluate(X_gt, X_bad)["score"]
 
     assert -1 <= good_score <= 1
     assert -1 <= bad_score <= 1
@@ -395,25 +396,27 @@ def test_evaluate_tf_tg_similarity() -> None:
     assert TFTGSimilarity.type() == "stats"
     assert TFTGSimilarity.direction() == "maximize"
 
+
 def test_evaluate_tg_tg_similarity() -> None:
     np.random.seed(0)
     genes = ["TF1", "TF2", "G1", "G2", "G3", "G4"]
     real_df = pd.DataFrame(np.random.randn(80, len(genes)), columns=genes)
 
     # simple GRN
-    grn = {"TF1": ["G1", "G2", "G3"],
-           "TF2": ["G2", "G4"]}
+    grn = {"TF1": ["G1", "G2", "G3"], "TF2": ["G2", "G4"]}
 
-    X_gt   = GeneExpressionDataLoader(real_df, grn=grn)
-    X_good = GeneExpressionDataLoader(real_df + 0.05*np.random.randn(*real_df.shape), grn=grn)
-    X_bad  = GeneExpressionDataLoader(np.random.randn(*real_df.shape), grn=grn)
+    X_gt = GeneExpressionDataLoader(real_df, grn=grn)
+    X_good = GeneExpressionDataLoader(
+        real_df + 0.05 * np.random.randn(*real_df.shape), grn=grn
+    )
+    X_bad = GeneExpressionDataLoader(np.random.randn(*real_df.shape), grn=grn)
 
     ev = TGTGSimilarity(grn=grn, use_cache=False)
     good = ev.evaluate(X_gt, X_good)["score"]
-    bad  = ev.evaluate(X_gt, X_bad )["score"]
+    bad = ev.evaluate(X_gt, X_bad)["score"]
 
     assert -1 <= good <= 1
-    assert -1 <= bad  <= 1
+    assert -1 <= bad <= 1
     assert good >= bad
 
     assert TGTGSimilarity.name() == "tg_tg_similarity"

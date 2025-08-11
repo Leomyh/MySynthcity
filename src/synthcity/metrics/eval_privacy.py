@@ -609,38 +609,39 @@ class DomiasMIABNAF(DomiasMIA):
         )
         return p_G_evaluated, p_R_evaluated
 
+
 class AdversarialAccuracy(PrivacyEvaluator):
     """
-        Adversarial Accuracy (AA) from Yale et al. (2020).
+    Adversarial Accuracy (AA) from Yale et al. (2020).
 
-        Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC10311334/
+    Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC10311334/
 
-        Intuition
-        ---------
-        AA tells us whether synthetic data are
-        (i) too close to the real data – privacy leakage, low utility – or
-        (ii) too far away – poor fidelity.
-        It is the accuracy of a 1-NN classifier that tries to distinguish real from synthetic samples using Euclidean distances.
+    Intuition
+    ---------
+    AA tells us whether synthetic data are
+    (i) too close to the real data – privacy leakage, low utility – or
+    (ii) too far away – poor fidelity.
+    It is the accuracy of a 1-NN classifier that tries to distinguish real from synthetic samples using Euclidean distances.
 
-        Let
-            d_tt(i):  nearest-neighbor distance from real sample i to all other real samples (excluding itself)
-            d_tg(i):  NN distance from real sample i to the synthetic set
-            d_gg(j):  NN distance from synthetic sample j to all other synthetic samples (excluding itself)
-            d_gt(j):  NN distance from synthetic sample j to the real set
+    Let
+        d_tt(i):  nearest-neighbor distance from real sample i to all other real samples (excluding itself)
+        d_tg(i):  NN distance from real sample i to the synthetic set
+        d_gg(j):  NN distance from synthetic sample j to all other synthetic samples (excluding itself)
+        d_gt(j):  NN distance from synthetic sample j to the real set
 
-        The metric is
+    The metric is
 
-            AA = 0.5 * [ (1/n) Σ 1( d_tg(i) > d_tt(i) )   +
-                        (1/m) Σ 1( d_gt(j) > d_gg(j) )
-                       ]
+        AA = 0.5 * [ (1/n) Σ 1( d_tg(i) > d_tt(i) )   +
+                    (1/m) Σ 1( d_gt(j) > d_gg(j) )
+                   ]
 
-        Range and interpretation
-        ------------------------
-          • AA → 0 : generator over-fits (synthetic ≈ real, privacy ↓, utility ↓)
-          • AA → 1 : generator under-fits (synthetic easily separable, utility ↓)
-          • AA ≈ 0.5 : good trade-off between realism and privacy (ideal)
+    Range and interpretation
+    ------------------------
+      • AA → 0 : generator over-fits (synthetic ≈ real, privacy ↓, utility ↓)
+      • AA → 1 : generator under-fits (synthetic easily separable, utility ↓)
+      • AA ≈ 0.5 : good trade-off between realism and privacy (ideal)
 
-        The evaluator returns {"aa": float}.
+    The evaluator returns {"aa": float}.
     """
 
     def __init__(self, **kwargs: Any) -> None:
@@ -677,11 +678,11 @@ class AdversarialAccuracy(PrivacyEvaluator):
         if len(syn) > 1:
             nn_syn = NearestNeighbors(n_neighbors=2).fit(syn)
             d_gg = nn_syn.kneighbors(syn, return_distance=True)[0][:, 1]
-        else:# edge case: only one synthetic sample
+        else:  # edge case: only one synthetic sample
             d_gg = np.full(len(syn), np.inf)
 
         # 4) Compute AA
-        aa_left  = (d_tg > d_tt).mean()
+        aa_left = (d_tg > d_tt).mean()
         aa_right = (d_gt > d_gg).mean()
         aa = 0.5 * (aa_left + aa_right)
         aa = max(aa, 1e-8)  # add epsilon to pass test
@@ -696,23 +697,25 @@ class AdversarialAccuracy(PrivacyEvaluator):
         dists = np.linalg.norm(a[:, None, :] - b[None, :, :], axis=-1)
         return dists.min(axis=1)
 
+
 class EpsilonIdentifiability(PrivacyEvaluator):
     """
-        epsilon-Identifiability from Yoon *et al.*, IEEE JBHI 2019, DOI 10.1109/JBHI.2018.2880147
+    epsilon-Identifiability from Yoon *et al.*, IEEE JBHI 2019, DOI 10.1109/JBHI.2018.2880147
 
-        Reference:  <https://ieeexplore.ieee.org/document/9034117>
+    Reference:  <https://ieeexplore.ieee.org/document/9034117>
 
-        I(D, D̂) = 1/N · Σ 1[r^hat_i < r_i]
+    I(D, D̂) = 1/N · Σ 1[r^hat_i < r_i]
 
-        • r_i  : min weighted-Euclidean distance from real xᵢ to another real
-        • r^hat_i : min weighted-Euclidean distance from real x_i to any synthetic
-        • weights w_j = 1 / H(X^{(j)})  (inverse discrete entropy of column j)
+    • r_i  : min weighted-Euclidean distance from real xᵢ to another real
+    • r^hat_i : min weighted-Euclidean distance from real x_i to any synthetic
+    • weights w_j = 1 / H(X^{(j)})  (inverse discrete entropy of column j)
 
-        Lower values ⇒ more privacy leakage
+    Lower values ⇒ more privacy leakage
     """
+
     def __init__(self, epsilon: float = 0.5, **kwargs):
         super().__init__(default_metric="I", **kwargs)
-        self.epsilon = epsilon                       # user-set threshold
+        self.epsilon = epsilon  # user-set threshold
 
     @staticmethod
     def name() -> str:
@@ -720,7 +723,7 @@ class EpsilonIdentifiability(PrivacyEvaluator):
 
     @staticmethod
     def direction() -> str:
-        return "maximize"      # higher value ⇒ safer data
+        return "maximize"  # higher value ⇒ safer data
 
     # -------- main  --------
     def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader, **_) -> Dict:
@@ -728,28 +731,28 @@ class EpsilonIdentifiability(PrivacyEvaluator):
             raise ValueError("Metric not defined for images.")
 
         # 1) common preprocessing
-        real = X_gt.numpy()            # shape (N,d)
-        synth = X_syn.numpy()          # shape (M,d)
+        real = X_gt.numpy()  # shape (N,d)
+        synth = X_syn.numpy()  # shape (M,d)
         w = self._weight_vector(X_gt)  # shape (d,)
 
         # 2) compute r_i  (min to *other* real rows)
         #    efficient: nearest-neighbor search in weighted space
-        Rw = real * w                  # weight each column
-        nn = NearestNeighbors(n_neighbors=2, metric='euclidean').fit(Rw)
+        Rw = real * w  # weight each column
+        nn = NearestNeighbors(n_neighbors=2, metric="euclidean").fit(Rw)
         dist_real, _ = nn.kneighbors(Rw)
-        r   = dist_real[:,1]           # skip self-distance (0)
+        r = dist_real[:, 1]  # skip self-distance (0)
 
         # 3) compute r^hat_i  (min to any synthetic row)
         Sw = synth * w
-        nn_syn = NearestNeighbors(n_neighbors=1, metric='euclidean').fit(Sw)
+        nn_syn = NearestNeighbors(n_neighbors=1, metric="euclidean").fit(Sw)
         r_hat, _ = nn_syn.kneighbors(Rw)
-        r_hat = r_hat[:,0]
+        r_hat = r_hat[:, 0]
 
         # 4) indicator + score
         I_val = (r_hat < r).mean()
 
         return {
-            "I": 1.0 - I_val,          # higher ⇒ safer
+            "I": 1.0 - I_val,  # higher ⇒ safer
         }
 
     # -------- helper --------
@@ -766,7 +769,7 @@ class EpsilonIdentifiability(PrivacyEvaluator):
 
     @staticmethod
     def _pairwise_min_dist(x: np.ndarray, Y: np.ndarray, w: np.ndarray) -> float:
-        """return min  ||w·(x-y)||_2  over y ∈Y """
+        """return min  ||w·(x-y)||_2  over y ∈Y"""
         diffs = (x - Y) * w
         return np.linalg.norm(diffs, axis=1).min()
 
@@ -774,20 +777,20 @@ class EpsilonIdentifiability(PrivacyEvaluator):
         """Return ‘privacy-safe’ score = 1 – I."""
         return self.evaluate(X_gt, X_syn)["I"]
 
+
 class tCloseness(PrivacyEvaluator):
     """
-        Returns the t-closeness score between the real data and the synthetic data.
-        Measures how close the sensitive attribute distribution in each equivalence class is to the global distribution from real data.
+    Returns the t-closeness score between the real data and the synthetic data.
+    Measures how close the sensitive attribute distribution in each equivalence class is to the global distribution from real data.
 
-        Reference:
-            Li, Ninghui, Tiancheng Li, and Suresh Venkatasubramanian.
-            "t-closeness: Privacy beyond k-anonymity and l-diversity." ICDE 2007.
+    Reference:
+        Li, Ninghui, Tiancheng Li, and Suresh Venkatasubramanian.
+        "t-closeness: Privacy beyond k-anonymity and l-diversity." ICDE 2007.
     """
 
-    def __init__(self,
-                 sensitive_column: str = "sensitive",
-                 n_clusters: int = 10,
-                 **kwargs: Any) -> None:
+    def __init__(
+        self, sensitive_column: str = "sensitive", n_clusters: int = 10, **kwargs: Any
+    ) -> None:
         super().__init__(default_metric="t", **kwargs)
         self.sensitive_column = sensitive_column
         self.n_clusters = n_clusters
@@ -844,6 +847,4 @@ class tCloseness(PrivacyEvaluator):
 
         max_t = max(t_vals) if t_vals else 0.0
 
-        return {
-            "t": float(max_t)
-        }
+        return {"t": float(max_t)}

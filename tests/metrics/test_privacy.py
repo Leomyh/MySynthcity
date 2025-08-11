@@ -10,16 +10,16 @@ from torchvision import datasets
 
 # synthcity absolute
 from synthcity.metrics.eval_privacy import (
+    AdversarialAccuracy,
     DeltaPresence,
     DomiasMIABNAF,
     DomiasMIAKDE,
     DomiasMIAPrior,
+    EpsilonIdentifiability,
     IdentifiabilityScore,
     kAnonymization,
     kMap,
     lDiversityDistinct,
-    AdversarialAccuracy,
-    EpsilonIdentifiability,
     tCloseness,
 )
 from synthcity.plugins import Plugin, Plugins

@@ -370,6 +370,7 @@ class Benchmarks:
 
         out = pd.concat(means, axis=1)
         out.columns = list(results.keys())
+
         out = out.set_axis(list(results.keys()), axis=1, copy=False)
 
         bad_highlight = "background-color: lightcoral;"

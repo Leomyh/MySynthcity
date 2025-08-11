@@ -713,7 +713,7 @@ class EpsilonIdentifiability(PrivacyEvaluator):
     Lower values ⇒ more privacy leakage
     """
 
-    def __init__(self, epsilon: float = 0.5, **kwargs):
+    def __init__(self, epsilon: float = 0.5, **kwargs: Any) -> None:
         super().__init__(default_metric="I", **kwargs)
         self.epsilon = epsilon  # user-set threshold
 
@@ -726,7 +726,8 @@ class EpsilonIdentifiability(PrivacyEvaluator):
         return "maximize"  # higher value ⇒ safer data
 
     # -------- main  --------
-    def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader, **_) -> Dict:
+    @validate_arguments(config=dict(arbitrary_types_allowed=True))
+    def _evaluate(self, X_gt: DataLoader, X_syn: DataLoader) -> Dict:
         if X_gt.type() == "images":
             raise ValueError("Metric not defined for images.")
 
@@ -773,7 +774,9 @@ class EpsilonIdentifiability(PrivacyEvaluator):
         diffs = (x - Y) * w
         return np.linalg.norm(diffs, axis=1).min()
 
-    def evaluate_default(self, X_gt, X_syn, *a, **k):
+    def evaluate_default(
+        self, X_gt: DataLoader, X_syn: DataLoader, *a: Any, **k: Any
+    ) -> float:
         """Return ‘privacy-safe’ score = 1 – I."""
         return self.evaluate(X_gt, X_syn)["I"]
 

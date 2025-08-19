@@ -13,7 +13,7 @@ from scipy import linalg
 from scipy.cluster.hierarchy import cophenet, dendrogram, fcluster, linkage, to_tree
 from scipy.spatial.distance import jensenshannon, squareform
 from scipy.special import kl_div,softmax
-from scipy.stats import chisquare, ks_2samp,spearmanr,entropy,corrcoef
+from scipy.stats import chisquare, ks_2samp,spearmanr,entropy
 from sklearn import metrics
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler

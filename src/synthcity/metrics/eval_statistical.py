@@ -13,7 +13,7 @@ from scipy import linalg
 from scipy.cluster.hierarchy import cophenet, dendrogram, fcluster, linkage, to_tree
 from scipy.spatial.distance import jensenshannon, squareform
 from scipy.special import kl_div,softmax
-from scipy.stats import chisquare, ks_2samp,spearmanr,entropy
+from scipy.stats import chisquare, ks_2samp,spearmanr,entropy,corrcoef
 from sklearn import metrics
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler
@@ -982,8 +982,8 @@ class MatrixDistance(StatisticalEvaluator):
         data_syn = df_syn.to_numpy().T
 
         if self.distance_metric == "pearson":
-            dist_real = metrics.pairwise_distances(data_real, metric="correlation")
-            dist_syn = metrics.pairwise_distances(data_syn, metric="correlation")
+            dist_real = np.corrcoef(data_real)
+            dist_syn = np.corrcoef(data_syn)
         elif self.distance_metric == "spearman":
             rho_real, _ = spearmanr(data_real, axis=1)
             rho_syn, _ = spearmanr(data_syn, axis=1)
@@ -1022,7 +1022,12 @@ class MatrixDistance(StatisticalEvaluator):
         vec_syn = dist_syn[idx]
 
         try:
-            gamma = metrics.pairwise_distances(vec_real.reshape(1, -1), vec_syn.reshape(1, -1), metric=self.coef)
+            if self.coef == "pearson":
+                gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
+            elif self.coef == "spearman":
+                gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
+            else:
+                gamma = metrics.pairwise_distances(vec_real.reshape(1, -1), vec_syn.reshape(1, -1), metric=self.coef)
         except ValueError:
             gamma = 0.0
 

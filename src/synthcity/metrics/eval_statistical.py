@@ -1022,7 +1022,7 @@ class MatrixDistance(StatisticalEvaluator):
         vec_syn = dist_syn[idx]
 
         try:
-            gamma = metrics.pairwise_distances(vec_real.reshape(1, -1), vec_syn.reshape(1, -1), metric=self.coef)[0, 1]
+            gamma = metrics.pairwise_distances(vec_real.reshape(1, -1), vec_syn.reshape(1, -1), metric=self.coef)
         except ValueError:
             gamma = 0.0
 

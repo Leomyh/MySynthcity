@@ -12,8 +12,8 @@ from pydantic import validate_arguments
 from scipy import linalg
 from scipy.cluster.hierarchy import cophenet, dendrogram, fcluster, linkage, to_tree
 from scipy.spatial.distance import jensenshannon, squareform
-from scipy.special import kl_div
-from scipy.stats import chisquare, ks_2samp
+from scipy.special import kl_div,softmax
+from scipy.stats import chisquare, ks_2samp,spearmanr,entropy
 from sklearn import metrics
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler
@@ -941,17 +941,11 @@ class MatrixDistance(StatisticalEvaluator):
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(self, distance_metric: str = "correlation", **kwargs: Any):
-        if not (
-            callable(distance_metric)
-            or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
-            or distance_metric is not None
-        ):
-            raise ValueError(
-                f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
-            )
+    def __init__(self, distance_metric: str = "pearson", coef: str = "euclidean", **kwargs: Any):
+
         super().__init__(default_metric="marginal", **kwargs)
         self.distance_metric = distance_metric
+        self.coef = coef
 
     @staticmethod
     def name() -> str:
@@ -964,6 +958,7 @@ class MatrixDistance(StatisticalEvaluator):
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
         # Load the dataframes
+        global dist_real, dist_syn
         df_real = X.dataframe().iloc[:, :-1]
         df_syn = X_syn.dataframe().iloc[:, :-1]
 
@@ -986,10 +981,39 @@ class MatrixDistance(StatisticalEvaluator):
         data_real = df_real.to_numpy().T  # [n_features, n_samples]
         data_syn = df_syn.to_numpy().T
 
+        if self.distance_metric == "pearson":
+            dist_real = metrics.pairwise_distances(data_real, metric="correlation")
+            dist_syn = metrics.pairwise_distances(data_syn, metric="correlation")
+        elif self.distance_metric == "spearman":
+            rho_real, _ = spearmanr(data_real, axis=1)
+            rho_syn, _ = spearmanr(data_syn, axis=1)
+            dist_real = rho_real
+            dist_syn = rho_syn
+        elif self.distance_metric == "kl":
+            P_real = softmax(data_real, axis=1)
+            P_syn = softmax(data_syn, axis=1)
+
+            def kl_colmat(P):
+                n = P.shape[0]
+                D = np.zeros((n, n), dtype=float)
+                for i in range(n):
+                    for j in range(n):
+                        if i == j:
+                            continue
+                        #  KL(P_i || P_j)
+                        D[i, j] = entropy(P[i], P[j])  #entropy(..., base=2)
+                # simm：
+                D = 0.5 * (D + D.T)
+                np.fill_diagonal(D, 0.0)
+                return D
+
+            dist_real = kl_colmat(P_real)
+            dist_syn = kl_colmat(P_syn)
+
         # Compute the pairwise distance matrices for real and synthetic data
         # The resulting distance matrix is of shape [n_features, n_features]
-        dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
-        dist_syn = metrics.pairwise_distances(data_syn, metric=self.distance_metric)
+        #dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
+        #dist_syn = metrics.pairwise_distances(data_syn, metric=self.distance_metric)
 
         # Vectorize the upper‑triangle (excluding the diagonal)
         n = dist_real.shape[0]
@@ -997,11 +1021,18 @@ class MatrixDistance(StatisticalEvaluator):
         vec_real = dist_real[idx]
         vec_syn = dist_syn[idx]
 
-        # Pearson correlation between the two vectors
-        if vec_real.std() == 0 or vec_syn.std() == 0:
+        try:
+            gamma = metrics.pairwise_distances(vec_real.reshape(1, -1), vec_syn.reshape(1, -1), metric=self.coef)[0, 1]
+        except ValueError:
             gamma = 0.0
-        else:
-            gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
+
+        # Pearson correlation between the two vectors
+        #if vec_real.std() == 0 or vec_syn.std() == 0:
+         #   gamma = 0.0
+        #else:
+            #gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
+
+         #   gamma = metrics.pairwise_distances(vec_real.reshape(1,-1),vec_syn.reshape(1,-1), metric=self.distance_metric)[0, 1]
 
         return {"marginal": float(gamma)}
 

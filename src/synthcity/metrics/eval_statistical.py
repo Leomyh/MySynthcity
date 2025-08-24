@@ -943,12 +943,17 @@ class MatrixDistance(StatisticalEvaluator):
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def __init__(self, d_metric: str = "pearson", pairwise_distance: str = "euclidean", **kwargs: Any):
         VALID_d_metrics = ["pearson", "spearman","kl_divergence"]
-        if d_metric not in VALID_d_metrics or d_metric is not None:
+
+        if d_metric is None:
+            pass
+        elif d_metric not in VALID_d_metrics:
             raise RuntimeError(f"d_metric must be one of {VALID_d_metrics}")
-        if not (
+
+        if pairwise_distance is None:
+            pass
+        elif not (
                 callable(pairwise_distance)
                 or pairwise_distance in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
-                or pairwise_distance is None
                 or pairwise_distance == "pearson"
                 or pairwise_distance == "spearman"
         ):
@@ -1068,7 +1073,7 @@ class DendrogramDistance(StatisticalEvaluator):
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def __init__(
         self,
-        linkage_method: str = "complete",
+        linkage_method: str = "single",
         d_metric: str = "pearson",
         pairwise_distance: str = "euclidean",
         **kwargs: Any,
@@ -1085,12 +1090,16 @@ class DendrogramDistance(StatisticalEvaluator):
         ]
         VALID_d_metrics = ["pearson", "spearman", "kl_divergence"]
 
-        if d_metric not in VALID_d_metrics or d_metric is not None:
+        if d_metric is None:
+            pass
+        elif d_metric not in VALID_d_metrics:
             raise RuntimeError(f"d_metric must be one of {VALID_d_metrics}")
-        if not (
+
+        if pairwise_distance is None:
+            pass
+        elif not (
             callable(pairwise_distance)
             or pairwise_distance in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
-            or pairwise_distance is None
             or pairwise_distance == "pearson"
             or pairwise_distance == "spearman"
         ):
@@ -1098,10 +1107,11 @@ class DendrogramDistance(StatisticalEvaluator):
                 f"Invalid distance metric: '{pairwise_distance}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())} or pearson or spearman"
             )
 
-        if not (
+        if linkage_method is None:
+            pass
+        elif not (
             callable(linkage_method)
             or linkage_method in VALID_LINKAGE_METHODS
-            or linkage_method is not None
         ):
             raise ValueError(
                 f"Invalid linkage method: '{linkage_method}'. Must be one of: {VALID_LINKAGE_METHODS}"

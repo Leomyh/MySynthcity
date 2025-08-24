@@ -11,9 +11,9 @@ from geomloss import SamplesLoss
 from pydantic import validate_arguments
 from scipy import linalg
 from scipy.cluster.hierarchy import cophenet, dendrogram, fcluster, linkage, to_tree
-from scipy.spatial.distance import jensenshannon, squareform
+from scipy.spatial.distance import jensenshannon, squareform,pdist
 from scipy.special import kl_div,softmax
-from scipy.stats import chisquare, ks_2samp,spearmanr,entropy
+from scipy.stats import chisquare, ks_2samp,spearmanr,entropy,rankdata
 from sklearn import metrics
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler
@@ -1156,13 +1156,13 @@ class DendrogramDistance(StatisticalEvaluator):
         data_syn = df_syn.to_numpy().T
 
         if self.d_metric == "pearson":
-            dist_real = np.corrcoef(data_real)
-            dist_syn = np.corrcoef(data_syn)
+            con_real = pdist(data_real, metric='correlation')  # = 1 - Pearson corr
+            con_syn = pdist(data_syn, metric='correlation')
         elif self.d_metric == "spearman":
-            rho_real, _ = spearmanr(data_real, axis=1)
-            rho_syn, _ = spearmanr(data_syn, axis=1)
-            dist_real = rho_real
-            dist_syn = rho_syn
+            real_rank = np.apply_along_axis(rankdata, 1, data_real)
+            syn_rank = np.apply_along_axis(rankdata, 1, data_syn)
+            con_real = pdist(real_rank, metric='correlation')
+            con_syn = pdist(syn_rank, metric='correlation')
         elif self.d_metric == "kl_divergence":
             P_real = softmax(data_real, axis=1)
             P_syn = softmax(data_syn, axis=1)
@@ -1183,6 +1183,8 @@ class DendrogramDistance(StatisticalEvaluator):
 
             dist_real = kl_colmat(P_real)
             dist_syn = kl_colmat(P_syn)
+            con_real = squareform(dist_real, checks=True)
+            con_syn = squareform(dist_syn, checks=True)
 
         # Compute the pairwise distance matrices for real and synthetic data
         # The resulting distance matrix is of shape [n_features, n_features]
@@ -1190,8 +1192,8 @@ class DendrogramDistance(StatisticalEvaluator):
         #dist_syn = metrics.pairwise_distances(data_syn, metric=self.d_metric)
 
         # Condensed form (required by linkage)
-        con_real = squareform(dist_real, checks=False)
-        con_syn = squareform(dist_syn, checks=False)
+        #con_real = squareform(dist_real, checks=False)
+        #con_syn = squareform(dist_syn, checks=False)
 
         # Build linkage (hierarchical clustering) trees
         tree_real = linkage(con_real, method=self.linkage_method)

@@ -941,11 +941,24 @@ class MatrixDistance(StatisticalEvaluator):
     """
 
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
-    def __init__(self, distance_metric: str = "pearson", coef: str = "euclidean", **kwargs: Any):
+    def __init__(self, d_metric: str = "pearson", pairwise_distance: str = "euclidean", **kwargs: Any):
+        VALID_d_metrics = ["pearson", "spearman","kl_divergence"]
+        if d_metric not in VALID_d_metrics or d_metric is not None:
+            raise RuntimeError(f"d_metric must be one of {VALID_d_metrics}")
+        if not (
+                callable(pairwise_distance)
+                or pairwise_distance in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
+                or pairwise_distance is None
+                or pairwise_distance == "pearson"
+                or pairwise_distance == "spearman"
+        ):
+            raise ValueError(
+                f"Invalid distance metric: '{pairwise_distance}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())} or pearson or spearman"
+            )
 
         super().__init__(default_metric="marginal", **kwargs)
-        self.distance_metric = distance_metric
-        self.coef = coef
+        self.d_metric = d_metric
+        self.pairwaise_distance = pairwise_distance
 
     @staticmethod
     def name() -> str:
@@ -981,15 +994,15 @@ class MatrixDistance(StatisticalEvaluator):
         data_real = df_real.to_numpy().T  # [n_features, n_samples]
         data_syn = df_syn.to_numpy().T
 
-        if self.distance_metric == "pearson":
+        if self.d_metric == "pearson":
             dist_real = np.corrcoef(data_real)
             dist_syn = np.corrcoef(data_syn)
-        elif self.distance_metric == "spearman":
+        elif self.d_metric == "spearman":
             rho_real, _ = spearmanr(data_real, axis=1)
             rho_syn, _ = spearmanr(data_syn, axis=1)
             dist_real = rho_real
             dist_syn = rho_syn
-        elif self.distance_metric == "kl":
+        elif self.d_metric == "kl_divergence":
             P_real = softmax(data_real, axis=1)
             P_syn = softmax(data_syn, axis=1)
 
@@ -1022,12 +1035,12 @@ class MatrixDistance(StatisticalEvaluator):
         vec_syn = dist_syn[idx]
 
         try:
-            if self.coef == "pearson":
+            if self.pairwaise_distance == "pearson":
                 gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
-            elif self.coef == "spearman":
+            elif self.pairwaise_distance == "spearman":
                 gamma = np.corrcoef(vec_real, vec_syn)[0, 1]
             else:
-                gamma = metrics.pairwise_distances(vec_real.reshape(1, -1), vec_syn.reshape(1, -1), metric=self.coef)
+                gamma = metrics.pairwise_distances(vec_real.reshape(1, -1), vec_syn.reshape(1, -1), metric=self.pairwaise_distance)
         except ValueError:
             gamma = 0.0
 
@@ -1056,7 +1069,8 @@ class DendrogramDistance(StatisticalEvaluator):
     def __init__(
         self,
         linkage_method: str = "complete",
-        distance_metric: str = "correlation",
+        d_metric: str = "pearson",
+        pairwise_distance: str = "euclidean",
         **kwargs: Any,
     ):
 
@@ -1069,14 +1083,19 @@ class DendrogramDistance(StatisticalEvaluator):
             "centroid",
             "median",
         ]
+        VALID_d_metrics = ["pearson", "spearman", "kl_divergence"]
 
+        if d_metric not in VALID_d_metrics or d_metric is not None:
+            raise RuntimeError(f"d_metric must be one of {VALID_d_metrics}")
         if not (
-            callable(distance_metric)
-            or distance_metric in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
-            or distance_metric is not None
+            callable(pairwise_distance)
+            or pairwise_distance in metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS
+            or pairwise_distance is None
+            or pairwise_distance == "pearson"
+            or pairwise_distance == "spearman"
         ):
             raise ValueError(
-                f"Invalid distance metric: '{distance_metric}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())}"
+                f"Invalid distance metric: '{pairwise_distance}'. Must be one of: {list(metrics.pairwise.PAIRWISE_DISTANCE_FUNCTIONS.keys())} or pearson or spearman"
             )
 
         if not (
@@ -1090,7 +1109,8 @@ class DendrogramDistance(StatisticalEvaluator):
 
         super().__init__(default_metric="marginal", **kwargs)
         self.linkage_method = linkage_method
-        self.distance_metric = distance_metric
+        self.d_metric = d_metric
+        self.pairwise_distance = pairwise_distance
 
     @staticmethod
     def name() -> str:
@@ -1103,6 +1123,7 @@ class DendrogramDistance(StatisticalEvaluator):
     @validate_arguments(config=dict(arbitrary_types_allowed=True))
     def _evaluate(self, X: DataLoader, X_syn: DataLoader) -> Dict:
         #  Load the dataframes
+        global dist_real, dist_syn
         df_real = X.dataframe().iloc[:, :-1]
         df_syn = X_syn.dataframe().iloc[:, :-1]
 
@@ -1124,10 +1145,39 @@ class DendrogramDistance(StatisticalEvaluator):
         data_real = df_real.to_numpy().T
         data_syn = df_syn.to_numpy().T
 
+        if self.d_metric == "pearson":
+            dist_real = np.corrcoef(data_real)
+            dist_syn = np.corrcoef(data_syn)
+        elif self.d_metric == "spearman":
+            rho_real, _ = spearmanr(data_real, axis=1)
+            rho_syn, _ = spearmanr(data_syn, axis=1)
+            dist_real = rho_real
+            dist_syn = rho_syn
+        elif self.d_metric == "kl_divergence":
+            P_real = softmax(data_real, axis=1)
+            P_syn = softmax(data_syn, axis=1)
+
+            def kl_colmat(P):
+                n = P.shape[0]
+                D = np.zeros((n, n), dtype=float)
+                for i in range(n):
+                    for j in range(n):
+                        if i == j:
+                            continue
+                        #  KL(P_i || P_j)
+                        D[i, j] = entropy(P[i], P[j])  #entropy(..., base=2)
+                # simm：
+                D = 0.5 * (D + D.T)
+                np.fill_diagonal(D, 0.0)
+                return D
+
+            dist_real = kl_colmat(P_real)
+            dist_syn = kl_colmat(P_syn)
+
         # Compute the pairwise distance matrices for real and synthetic data
         # The resulting distance matrix is of shape [n_features, n_features]
-        dist_real = metrics.pairwise_distances(data_real, metric=self.distance_metric)
-        dist_syn = metrics.pairwise_distances(data_syn, metric=self.distance_metric)
+        #dist_real = metrics.pairwise_distances(data_real, metric=self.d_metric)
+        #dist_syn = metrics.pairwise_distances(data_syn, metric=self.d_metric)
 
         # Condensed form (required by linkage)
         con_real = squareform(dist_real, checks=False)
@@ -1141,11 +1191,21 @@ class DendrogramDistance(StatisticalEvaluator):
         _, dist_real = cophenet(tree_real, con_real)
         _, dist_syn = cophenet(tree_syn, con_syn)
 
-        # Pearson correlation between the two cophenetic‑distance vectors
-        if dist_real.std() == 0 or dist_syn.std() == 0:
+        try:
+            if self.pairwise_distance == "pearson":
+                gamma = np.corrcoef(dist_real, dist_syn)[0, 1]
+            elif self.pairwise_distance == "spearman":
+                gamma = np.corrcoef(dist_real, dist_syn)[0, 1]
+            else:
+                gamma = metrics.pairwise_distances(dist_real.reshape(1, -1), dist_syn.reshape(1, -1), metric=self.pairwise_distance)
+        except ValueError:
             gamma = 0.0
-        else:
-            gamma = np.corrcoef(dist_real, dist_syn)[0, 1]
+
+        # Pearson correlation between the two cophenetic‑distance vectors
+       # if dist_real.std() == 0 or dist_syn.std() == 0:
+        #    gamma = 0.0
+        #else:
+        #    gamma = np.corrcoef(dist_real, dist_syn)[0, 1]
 
         return {"marginal": float(gamma)}
 
